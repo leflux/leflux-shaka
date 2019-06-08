@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-describe('MediaSourceEngine', function() {
+describe('MediaSourceEngine', () => {
   const ContentType = shaka.util.ManifestParserUtils.ContentType;
   const presentationDuration = 840;
 
@@ -37,11 +37,8 @@ describe('MediaSourceEngine', function() {
    */
   let textDisplayer;
 
-  beforeAll(function() {
-    video = /** @type {!HTMLVideoElement} */ (document.createElement('video'));
-    video.width = 600;
-    video.height = 400;
-    video.muted = true;
+  beforeAll(() => {
+    video = shaka.util.Dom.createVideoElement();
     document.body.appendChild(video);
   });
 
@@ -69,19 +66,19 @@ describe('MediaSourceEngine', function() {
     await mediaSourceEngine.destroy();
   });
 
-  afterAll(function() {
+  afterAll(() => {
     document.body.removeChild(video);
   });
 
   function appendInit(type) {
-    let segment = generators[type].getInitSegment(Date.now() / 1000);
+    const segment = generators[type].getInitSegment(Date.now() / 1000);
     return mediaSourceEngine.appendBuffer(
         type, segment, null, null, /* hasClosedCaptions */ false);
   }
 
   function append(type, segmentNumber) {
-    let segment = generators[type].
-        getSegment(segmentNumber, 0, Date.now() / 1000);
+    const segment = generators[type]
+        .getSegment(segmentNumber, 0, Date.now() / 1000);
     return mediaSourceEngine.appendBuffer(
         type, segment, null, null, /* hasClosedCaptions */ false);
   }
@@ -89,7 +86,7 @@ describe('MediaSourceEngine', function() {
   // The start time and end time should be null for init segment with closed
   // captions.
   function appendInitWithClosedCaptions(type) {
-    let segment = generators[type].getInitSegment(Date.now() / 1000);
+    const segment = generators[type].getInitSegment(Date.now() / 1000);
     return mediaSourceEngine.appendBuffer(type, segment, /* startTime */ null,
         /* endTime */ null, /* hasClosedCaptions */ true);
   }
@@ -97,8 +94,8 @@ describe('MediaSourceEngine', function() {
   // The start time and end time should be valid for the segments with closed
   // captions.
   function appendWithClosedCaptions(type, segmentNumber) {
-    let segment = generators[type].
-        getSegment(segmentNumber, 0, Date.now() / 1000);
+    const segment = generators[type]
+        .getSegment(segmentNumber, 0, Date.now() / 1000);
     return mediaSourceEngine.appendBuffer(type, segment, /* startTime */ 0,
         /* endTime */ 2, /* hasClosedCaptions */ true);
   }
@@ -112,8 +109,8 @@ describe('MediaSourceEngine', function() {
   }
 
   function remove(type, segmentNumber) {
-    let start = (segmentNumber - 1) * metadata[type].segmentDuration;
-    let end = segmentNumber * metadata[type].segmentDuration;
+    const start = (segmentNumber - 1) * metadata[type].segmentDuration;
+    const end = segmentNumber * metadata[type].segmentDuration;
     return mediaSourceEngine.remove(type, start, end);
   }
 
@@ -196,30 +193,31 @@ describe('MediaSourceEngine', function() {
     expect(mediaSource.duration).toBeCloseTo(30);
   });
 
-  it('queues operations', function(done) {
-    let resolutionOrder = [];
-    let requests = [];
+  it('queues operations', async () => {
+    /** @type {!Array.<number>} */
+    const resolutionOrder = [];
+    /** @type {!Array.<!Promise>} */
+    const requests = [];
 
     function checkOrder(p) {
-      let nextIndex = requests.length;
-      requests.push(p);
-      p.then(function() { resolutionOrder.push(nextIndex); });
+      const nextIndex = requests.length;
+      requests.push(p.then(() => {
+        resolutionOrder.push(nextIndex);
+      }));
     }
 
     const initObject = new Map();
     initObject.set(ContentType.VIDEO, getFakeStream(metadata.video));
-    mediaSourceEngine.init(initObject, false).then(() => {
-      checkOrder(mediaSourceEngine.setDuration(presentationDuration));
-      checkOrder(appendInit(ContentType.VIDEO));
-      checkOrder(append(ContentType.VIDEO, 1));
-      checkOrder(append(ContentType.VIDEO, 2));
-      checkOrder(append(ContentType.VIDEO, 3));
-      checkOrder(mediaSourceEngine.endOfStream());
+    await mediaSourceEngine.init(initObject, false);
+    checkOrder(mediaSourceEngine.setDuration(presentationDuration));
+    checkOrder(appendInit(ContentType.VIDEO));
+    checkOrder(append(ContentType.VIDEO, 1));
+    checkOrder(append(ContentType.VIDEO, 2));
+    checkOrder(append(ContentType.VIDEO, 3));
+    checkOrder(mediaSourceEngine.endOfStream());
 
-      return Promise.all(requests);
-    }).then(() => {
-      expect(resolutionOrder).toEqual([0, 1, 2, 3, 4, 5]);
-    }).catch(fail).then(done);
+    await Promise.all(requests);
+    expect(resolutionOrder).toEqual([0, 1, 2, 3, 4, 5]);
   });
 
   it('buffers MP4 audio', async () => {
@@ -247,49 +245,39 @@ describe('MediaSourceEngine', function() {
     await mediaSourceEngine.init(initObject, false);
     await mediaSourceEngine.setDuration(presentationDuration);
 
-    let audioStreaming = appendInit(ContentType.AUDIO).then(() => {
-      return append(ContentType.AUDIO, 1);
-    }).then(() => {
+    const audioStreaming = async () => {
+      await appendInit(ContentType.AUDIO);
+      await append(ContentType.AUDIO, 1);
       expect(buffered(ContentType.AUDIO, 0)).toBeCloseTo(10, 1);
-      return append(ContentType.AUDIO, 2);
-    }).then(() => {
+      await append(ContentType.AUDIO, 2);
       expect(buffered(ContentType.AUDIO, 0)).toBeCloseTo(20, 1);
-      return append(ContentType.AUDIO, 3);
-    }).then(() => {
+      await append(ContentType.AUDIO, 3);
       expect(buffered(ContentType.AUDIO, 0)).toBeCloseTo(30, 1);
-      return append(ContentType.AUDIO, 4);
-    }).then(() => {
+      await append(ContentType.AUDIO, 4);
       expect(buffered(ContentType.AUDIO, 0)).toBeCloseTo(40, 1);
-      return append(ContentType.AUDIO, 5);
-    }).then(() => {
+      await append(ContentType.AUDIO, 5);
       expect(buffered(ContentType.AUDIO, 0)).toBeCloseTo(50, 1);
-      return append(ContentType.AUDIO, 6);
-    }).then(() => {
+      await append(ContentType.AUDIO, 6);
       expect(buffered(ContentType.AUDIO, 0)).toBeCloseTo(60, 1);
-    });
+    };
 
-    let videoStreaming = appendInit(ContentType.VIDEO).then(() => {
-      return append(ContentType.VIDEO, 1);
-    }).then(() => {
+    const videoStreaming = async () => {
+      await appendInit(ContentType.VIDEO);
+      await append(ContentType.VIDEO, 1);
       expect(buffered(ContentType.VIDEO, 0)).toBeCloseTo(10);
-      return append(ContentType.VIDEO, 2);
-    }).then(() => {
+      await append(ContentType.VIDEO, 2);
       expect(buffered(ContentType.VIDEO, 0)).toBeCloseTo(20);
-      return append(ContentType.VIDEO, 3);
-    }).then(() => {
+      await append(ContentType.VIDEO, 3);
       expect(buffered(ContentType.VIDEO, 0)).toBeCloseTo(30);
-      return append(ContentType.VIDEO, 4);
-    }).then(() => {
+      await append(ContentType.VIDEO, 4);
       expect(buffered(ContentType.VIDEO, 0)).toBeCloseTo(40);
-      return append(ContentType.VIDEO, 5);
-    }).then(() => {
+      await append(ContentType.VIDEO, 5);
       expect(buffered(ContentType.VIDEO, 0)).toBeCloseTo(50);
-      return append(ContentType.VIDEO, 6);
-    }).then(() => {
+      await append(ContentType.VIDEO, 6);
       expect(buffered(ContentType.VIDEO, 0)).toBeCloseTo(60);
-    });
+    };
 
-    await Promise.all([audioStreaming, videoStreaming]);
+    await Promise.all([audioStreaming(), videoStreaming()]);
     await mediaSourceEngine.endOfStream();
     expect(mediaSource.duration).toBeCloseTo(60, 1);
   });
@@ -301,9 +289,9 @@ describe('MediaSourceEngine', function() {
     await mediaSourceEngine.setDuration(presentationDuration);
     await appendInit(ContentType.VIDEO);
     await mediaSourceEngine.setStreamProperties(ContentType.VIDEO,
-                                                /* timestampOffset */ 0,
-                                                /* appendWindowStart */ 5,
-                                                /* appendWindowEnd */ 18);
+        /* timestampOffset */ 0,
+        /* appendWindowStart */ 5,
+        /* appendWindowEnd */ 18);
     expect(buffered(ContentType.VIDEO, 0)).toBe(0);
     await append(ContentType.VIDEO, 1);
     expect(bufferStart(ContentType.VIDEO)).toBeCloseTo(5, 1);
@@ -320,9 +308,9 @@ describe('MediaSourceEngine', function() {
     await appendInit(ContentType.VIDEO);
     // Simulate period 1, with 20 seconds of content, no timestamp offset
     await mediaSourceEngine.setStreamProperties(ContentType.VIDEO,
-                                                /* timestampOffset */ 0,
-                                                /* appendWindowStart */ 0,
-                                                /* appendWindowEnd */ 20);
+        /* timestampOffset */ 0,
+        /* appendWindowStart */ 0,
+        /* appendWindowEnd */ 20);
     await append(ContentType.VIDEO, 1);
     await append(ContentType.VIDEO, 2);
     expect(bufferStart(ContentType.VIDEO)).toBeCloseTo(0, 1);
@@ -332,9 +320,9 @@ describe('MediaSourceEngine', function() {
     // The 5 seconds of overlap should be trimmed off, and we should still
     // have a continuous stream with 35 seconds of content.
     await mediaSourceEngine.setStreamProperties(ContentType.VIDEO,
-                                                /* timestampOffset */ 15,
-                                                /* appendWindowStart */ 20,
-                                                /* appendWindowEnd */ 35);
+        /* timestampOffset */ 15,
+        /* appendWindowStart */ 20,
+        /* appendWindowEnd */ 35);
     await append(ContentType.VIDEO, 1);
     await append(ContentType.VIDEO, 2);
     expect(bufferStart(ContentType.VIDEO)).toBeCloseTo(0, 1);

@@ -15,8 +15,9 @@
  * limitations under the License.
  */
 
+filterDescribe('V1IndexeddbStorageCell', () => window.indexedDB, () => {
+  const Util = shaka.test.Util;
 
-describe('V1IndexeddbStorageCell', function() {
   const dbImagePath = '/base/test/test/assets/db-dump-v1.json';
 
   const dbName = 'shaka-storage-cell-test';
@@ -32,122 +33,120 @@ describe('V1IndexeddbStorageCell', function() {
   /** @type {!Array.<IDBDatabase>} */
   let connections = [];
 
-  beforeAll(async function() {
-    let data = await shaka.test.Util.fetch(dbImagePath);
+  beforeAll(async () => {
+    const data = await shaka.test.Util.fetch(dbImagePath);
     dbImageAsString = shaka.util.StringUtils.fromUTF8(data);
   });
 
-  beforeEach(function() {
+  beforeEach(() => {
     cells = [];
     connections = [];
   });
 
-  afterEach(async function() {
+  afterEach(async () => {
     // If the test did not run, then there will be no cells and no connections,
     // so we don't need to worry about checking if indexeddb is supported here.
 
     // Destroy the cells before killing any connections.
     await Promise.all(cells.map((cell) => cell.destroy()));
-    connections.forEach((connection) => connection.close());
+    for (const connection of connections) {
+      connection.close();
+    }
   });
 
-  it('cannot add new manifests', checkAndRun(async function() {
-    const expectedErrorCode =
-        shaka.util.Error.Code.NEW_KEY_OPERATION_NOT_SUPPORTED;
+  it('cannot add new manifests', async () => {
+    const expected = Util.jasmineError(new shaka.util.Error(
+        shaka.util.Error.Severity.CRITICAL,
+        shaka.util.Error.Category.STORAGE,
+        shaka.util.Error.Code.NEW_KEY_OPERATION_NOT_SUPPORTED,
+        jasmine.any(String)));
 
-    let connection = await makeConnection();
-    let cell = makeCell(connection);
+    const connection = await makeConnection();
+    const cell = makeCell(connection);
 
     // There should be one manifest.
-    let manifests = await cell.getAllManifests();
-    let manifest = manifests.get(0);
+    const manifests = await cell.getAllManifests();
+    const manifest = manifests.get(0);
     expect(manifest).toBeTruthy();
 
     // Make sure that the request fails.
-    try {
-      await cell.addManifests([manifest]);
-      fail();
-    } catch (e) {
-      expect(e.code).toEqual(expectedErrorCode);
-    }
-  }));
+    await expectAsync(cell.addManifests([manifest])).toBeRejectedWith(expected);
+  });
 
-  it('cannot add new segment', checkAndRun(async function() {
-    const expectedErrorCode =
-        shaka.util.Error.Code.NEW_KEY_OPERATION_NOT_SUPPORTED;
+  it('cannot add new segment', async () => {
+    const expected = Util.jasmineError(new shaka.util.Error(
+        shaka.util.Error.Severity.CRITICAL,
+        shaka.util.Error.Category.STORAGE,
+        shaka.util.Error.Code.NEW_KEY_OPERATION_NOT_SUPPORTED,
+        jasmine.any(String)));
 
-    let connection = await makeConnection();
-    let cell = makeCell(connection);
+    const connection = await makeConnection();
+    const cell = makeCell(connection);
 
     // Update the key to what should be a free key.
-    let segment = {data: new ArrayBuffer(16)};
+    const segment = {data: new ArrayBuffer(16)};
 
     // Make sure that the request fails.
-    try {
-      await cell.addSegments([segment]);
-      fail();
-    } catch (e) {
-      expect(e.code).toEqual(expectedErrorCode);
-    }
-  }));
+    await expectAsync(cell.addSegments([segment])).toBeRejectedWith(expected);
+  });
 
-  it('can get all manifests', checkAndRun(async function() {
-    let connection = await makeConnection();
-    let cell = makeCell(connection);
+  it('can get all manifests', async () => {
+    const connection = await makeConnection();
+    const cell = makeCell(connection);
 
     // There should be one manifest.
-    let map = await cell.getAllManifests();
+    const map = await cell.getAllManifests();
     expect(map).toBeTruthy();
     expect(map.size).toBe(1);
     expect(map.get(0)).toBeTruthy();
-  }));
+  });
 
-  it('can get manifest and all segments', checkAndRun(async function() {
-    let connection = await makeConnection();
-    let cell = makeCell(connection);
+  it('can get manifest and all segments', async () => {
+    const connection = await makeConnection();
+    const cell = makeCell(connection);
 
     // There should be one manifest.
-    let manifests = await cell.getManifests([0]);
-    let manifest = manifests[0];
+    const manifests = await cell.getManifests([0]);
+    const manifest = manifests[0];
     expect(manifest).toBeTruthy();
 
     // Collect all the keys for each segment.
-    let dataKeys = getAllSegmentKeys(manifest);
+    const dataKeys = getAllSegmentKeys(manifest);
 
     // Check that each segment was successfully retrieved.
-    let segmentData = await cell.getSegments(dataKeys);
+    const segmentData = await cell.getSegments(dataKeys);
     expect(segmentData).toBeTruthy();
     expect(segmentData.length).toBe(6);
-    segmentData.forEach((segment) => {
+    for (const segment of segmentData) {
       expect(segment).toBeTruthy();
-    });
-  }));
+    }
+  });
 
-  it('can update expiration', checkAndRun(async function() {
+  it('can update expiration', async () => {
     // Keys and old values are pulled directly from the db image.
     const manifestKey = 0;
     const oldExpiration = Infinity;
     const newExpiration = 1000;
 
-    let connection = await makeConnection();
-    let cell = makeCell(connection);
+    const connection = await makeConnection();
+    const cell = makeCell(connection);
 
-    let original = await cell.getManifests([manifestKey]);
+    const original = await cell.getManifests([manifestKey]);
     expect(original).toBeTruthy();
     expect(original[0]).toBeTruthy();
     expect(original[0].expiration).toBe(oldExpiration);
 
     await cell.updateManifestExpiration(manifestKey, newExpiration);
 
-    let updated = await cell.getManifests([manifestKey]);
+    const updated = await cell.getManifests([manifestKey]);
     expect(updated).toBeTruthy();
     expect(updated[0]).toBeTruthy();
     expect(updated[0].expiration).toBe(newExpiration);
-  }));
+  });
 
-  it('can remove manifests and segments', checkAndRun(async function() {
-    let connection = await makeConnection();
-    let cell = makeCell(connection);
+  it('can remove manifests and segments', async () => {
+    const connection = await makeConnection();
+    const cell = makeCell(connection);
 
     /** @type {!Array.<number>} */
     const manifestKeys = [];
@@ -171,36 +170,31 @@ describe('V1IndexeddbStorageCell', function() {
     await cell.removeManifests(manifestKeys, noop);
     await cell.removeSegments(segmentKeys, noop);
 
-    let checkMissingSegment = async (key) => {
-      try {
-        await cell.getSegments([key]);
-        fail();
-      } catch (e) {
-        expect(e.code).toBe(shaka.util.Error.Code.KEY_NOT_FOUND);
-      }
+    const expected = Util.jasmineError(new shaka.util.Error(
+        shaka.util.Error.Severity.CRITICAL,
+        shaka.util.Error.Category.STORAGE,
+        shaka.util.Error.Code.KEY_NOT_FOUND,
+        jasmine.any(String)));
+    const checkMissingSegment = async (key) => {
+      await expectAsync(cell.getSegments([key])).toBeRejectedWith(expected);
     };
 
-    let checkMissingManifest = async (key) => {
-      try {
-        await cell.getManifests([key]);
-        fail();
-      } catch (e) {
-        expect(e.code).toBe(shaka.util.Error.Code.KEY_NOT_FOUND);
-      }
+    const checkMissingManifest = async (key) => {
+      await expectAsync(cell.getManifests([key])).toBeRejectedWith(expected);
     };
 
     // Need to check each key on its own to ensure that each key is missing
     // and not just one of the keys is missing.
-    let checkMissingSegments = (keys) => {
+    const checkMissingSegments = (keys) => {
       return Promise.all(keys.map((key) => checkMissingSegment(key)));
     };
-    let checkMissingManifests = (keys) => {
+    const checkMissingManifests = (keys) => {
       return Promise.all(keys.map((key) => checkMissingManifest(key)));
     };
 
     await checkMissingSegments(/** @type {!Array.<number>} */(segmentKeys));
     await checkMissingManifests(/** @type {!Array.<number>} */(manifestKeys));
-  }));
+  });
 
   /**
    * Get the keys for each segment. This will include the init segments.
@@ -209,19 +203,19 @@ describe('V1IndexeddbStorageCell', function() {
    * @return {!Array.<number>}
    */
   function getAllSegmentKeys(manifest) {
-    let keys = [];
+    const keys = [];
 
-    manifest.periods.forEach((period) => {
-      period.streams.forEach((stream) => {
+    for (const period of manifest.periods) {
+      for (const stream of period.streams) {
         if (stream.initSegmentKey != null) {
           keys.push(stream.initSegmentKey);
         }
 
-        stream.segments.forEach((segment) => {
+        for (const segment of stream.segments) {
           keys.push(segment.dataKey);
-        });
-      });
-    });
+        }
+      }
+    }
 
     return keys;
   }
@@ -235,7 +229,7 @@ describe('V1IndexeddbStorageCell', function() {
     await CannedIDB.restoreJSON(dbName, dbImageAsString, startFromScratch);
 
     // Track the connection so that we can close it when the test is over.
-    let connection = await shaka.test.IndexedDBUtils.open(dbName);
+    const connection = await shaka.test.IndexedDBUtils.open(dbName);
     connections.push(connection);
     return connection;
   }
@@ -245,7 +239,7 @@ describe('V1IndexeddbStorageCell', function() {
    * @return {shaka.extern.StorageCell}
    */
   function makeCell(connection) {
-    let cell = new shaka.offline.indexeddb.V1StorageCell(
+    const cell = new shaka.offline.indexeddb.V1StorageCell(
         connection,
         segmentStore,
         manifestStore);
@@ -254,21 +248,5 @@ describe('V1IndexeddbStorageCell', function() {
     cells.push(cell);
 
     return cell;
-  }
-
-  /**
-   * Before running the test, check if indexeddb is supported on this platform.
-   *
-   * @param {function():!Promise} test
-   * @return {function():!Promise}
-   */
-  function checkAndRun(test) {
-    return async () => {
-      if (window.indexedDB) {
-        await test();
-      } else {
-        pending('Indexeddb is not supported on this platform.');
-      }
-    };
   }
 });

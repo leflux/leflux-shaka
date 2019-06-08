@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-describe('SimpleAbrManager', function() {
+describe('SimpleAbrManager', () => {
   const sufficientBWMultiplier = 1.06;
   const defaultBandwidthEstimate = 500e3; // 500kbps
 
@@ -31,40 +31,42 @@ describe('SimpleAbrManager', function() {
   let variants;
 
 
-  beforeAll(function() {
+  beforeAll(() => {
     jasmine.clock().install();
     jasmine.clock().mockDate();
     // This mock is required for fakeEventLoop.
     PromiseMock.install();
   });
 
-  beforeEach(function() {
+  beforeEach(() => {
     switchCallback = jasmine.createSpy('switchCallback');
 
     // Keep unsorted.
+    /* eslint-disable indent */
     manifest = new shaka.test.ManifestGenerator()
-      .addPeriod(0)
-        .addVariant(100).bandwidth(4e5)  // 400 kbps
-          .addAudio(0)
-          .addVideo(1)
-        .addVariant(101).bandwidth(1e6)  // 1000 kbps
-          .addAudio(2)
-          .addVideo(3)
-        .addVariant(102).bandwidth(5e5)  // 500 kbps
-          .addAudio(4)
-          .addVideo(5)
-        .addVariant(103).bandwidth(2e6)
-          .addAudio(6)
-          .addVideo(7)
-        .addVariant(104).bandwidth(2e6)  // Identical on purpose.
-          .addAudio(8)
-          .addVideo(9)
-        .addVariant(105).bandwidth(6e5)
-          .addAudio(10)
-          .addVideo(11)
-        .addTextStream(20)
-        .addTextStream(21)
-      .build();
+        .addPeriod(0)
+          .addVariant(100).bandwidth(4e5)  // 400 kbps
+            .addAudio(0)
+            .addVideo(1)
+          .addVariant(101).bandwidth(1e6)  // 1000 kbps
+            .addAudio(2)
+            .addVideo(3)
+          .addVariant(102).bandwidth(5e5)  // 500 kbps
+            .addAudio(4)
+            .addVideo(5)
+          .addVariant(103).bandwidth(2e6)
+            .addAudio(6)
+            .addVideo(7)
+          .addVariant(104).bandwidth(2e6)  // Identical on purpose.
+            .addAudio(8)
+            .addVideo(9)
+          .addVariant(105).bandwidth(6e5)
+            .addAudio(10)
+            .addVideo(11)
+          .addTextStream(20)
+          .addTextStream(21)
+        .build();
+    /* eslint-enable indent */
 
     config = shaka.util.PlayerConfiguration.createDefault().abr;
     config.defaultBandwidthEstimate = defaultBandwidthEstimate;
@@ -77,76 +79,78 @@ describe('SimpleAbrManager', function() {
     abrManager.setVariants(variants);
   });
 
-  afterEach(function() {
+  afterEach(() => {
     abrManager.stop();
   });
 
-  afterAll(function() {
+  afterAll(() => {
     PromiseMock.uninstall();
     jasmine.clock().uninstall();
   });
 
-  it('can choose audio and video Streams right away', function() {
-    let chosen = abrManager.chooseVariant();
+  it('can choose audio and video Streams right away', () => {
+    const chosen = abrManager.chooseVariant();
     expect(chosen).not.toBe(null);
   });
 
-  it('uses custom default estimate', function() {
+  it('uses custom default estimate', () => {
     config.defaultBandwidthEstimate = 3e6;
     abrManager.configure(config);
-    let chosen = abrManager.chooseVariant();
+    const chosen = abrManager.chooseVariant();
     expect(chosen.id).toBe(104);
   });
 
-  it('can handle empty variants', function() {
+  it('can handle empty variants', () => {
     abrManager.setVariants([]);
-    let chosen = abrManager.chooseVariant();
+    const chosen = abrManager.chooseVariant();
     expect(chosen).toEqual(null);
   });
 
-  it('can choose from audio only variants', function() {
+  it('can choose from audio only variants', () => {
+    /* eslint-disable indent */
     manifest = new shaka.test.ManifestGenerator()
-      .addPeriod(0)
-        .addVariant(0).bandwidth(4e5)
-          .addAudio(0)
-        .addVariant(1).bandwidth(1e6)
-          .addAudio(2)
-      .build();
+        .addPeriod(0)
+          .addVariant(0).bandwidth(4e5)
+            .addAudio(0)
+          .addVariant(1).bandwidth(1e6)
+            .addAudio(2)
+        .build();
+    /* eslint-enable indent */
 
     abrManager.setVariants(manifest.periods[0].variants);
-    let chosen = abrManager.chooseVariant();
+    const chosen = abrManager.chooseVariant();
     expect(chosen).not.toBe(null);
     expect(chosen.audio).not.toBe(null);
     expect(chosen.video).toBe(null);
   });
 
-  it('can choose from video only variants', function() {
+  it('can choose from video only variants', () => {
+    /* eslint-disable indent */
     manifest = new shaka.test.ManifestGenerator()
-      .addPeriod(0)
-        .addVariant(0).bandwidth(4e5)
-          .addVideo(0)
-        .addVariant(1).bandwidth(1e6)
-          .addVideo(2)
-      .build();
+        .addPeriod(0)
+          .addVariant(0).bandwidth(4e5)
+            .addVideo(0)
+          .addVariant(1).bandwidth(1e6)
+            .addVideo(2)
+        .build();
+    /* eslint-enable indent */
 
     abrManager.setVariants(manifest.periods[0].variants);
-    let chosen = abrManager.chooseVariant();
+    const chosen = abrManager.chooseVariant();
     expect(chosen).not.toBe(null);
     expect(chosen.audio).toBe(null);
     expect(chosen.video).not.toBe(null);
   });
 
-  [5e5, 6e5].forEach(function(bandwidth) {
+  for (const bandwidth of [5e5, 6e5]) {
     // Simulate some segments being downloaded just above the desired
     // bandwidth.
-    let bytesPerSecond =
-        sufficientBWMultiplier * bandwidth / 8.0;
+    const bytesPerSecond = sufficientBWMultiplier * bandwidth / 8.0;
 
-    let bandwidthKbps = bandwidth / 1000.0;
-    let description =
-        'picks correct Variant at ' + bandwidthKbps + ' kbps';
+    const bandwidthKbps = bandwidth / 1000.0;
+    const description = 'picks correct Variant at ' + bandwidthKbps + ' kbps';
 
-    it(description, function() {
+    it(description, () => {
       abrManager.setVariants(variants);
       abrManager.chooseVariant();
 
@@ -161,19 +165,18 @@ describe('SimpleAbrManager', function() {
 
       // Expect variants 2 to be chosen for bandwidth = 5e5
       // and variant 5 - for bandwidth = 6e5
-      let expectedVariant = (bandwidth == 6e5) ? variants[5] : variants[2];
+      const expectedVariant = (bandwidth == 6e5) ? variants[5] : variants[2];
 
       expect(switchCallback).toHaveBeenCalledWith(expectedVariant);
     });
-  });
+  }
 
-  it('can handle 0 duration segments', function() {
+  it('can handle 0 duration segments', () => {
     // Makes sure bandwidth estimate doesn't get set to NaN
     // when a 0 duration segment is encountered.
     // https://github.com/google/shaka-player/issues/582
-    let bandwidth = 5e5;
-    let bytesPerSecond =
-        sufficientBWMultiplier * bandwidth / 8.0;
+    const bandwidth = 5e5;
+    const bytesPerSecond = sufficientBWMultiplier * bandwidth / 8.0;
 
     abrManager.setVariants(variants);
     abrManager.chooseVariant();
@@ -189,37 +192,34 @@ describe('SimpleAbrManager', function() {
     expect(abrManager.getBandwidthEstimate()).toBeTruthy();
   });
 
-  it('picks lowest variant when there is insufficient bandwidth',
-      function() {
-        let bandwidth = 2e6;
+  it('picks lowest variant when there is insufficient bandwidth', () => {
+    const bandwidth = 2e6;
 
-        abrManager.setVariants(variants);
-        abrManager.chooseVariant();
+    abrManager.setVariants(variants);
+    abrManager.chooseVariant();
 
-        // Simulate some segments being downloaded just above the desired
-        // bandwidth.
-        let bytesPerSecond =
-            sufficientBWMultiplier * bandwidth / 8.0;
+    // Simulate some segments being downloaded just above the desired
+    // bandwidth.
+    const bytesPerSecond = sufficientBWMultiplier * bandwidth / 8.0;
 
-        abrManager.segmentDownloaded(1000, bytesPerSecond);
-        abrManager.segmentDownloaded(1000, bytesPerSecond);
+    abrManager.segmentDownloaded(1000, bytesPerSecond);
+    abrManager.segmentDownloaded(1000, bytesPerSecond);
 
-        abrManager.enable();
+    abrManager.enable();
 
-        // Make another call to segmentDownloaded() so switchCallback() is
-        // called.
-        abrManager.segmentDownloaded(1000, bytesPerSecond);
+    // Make another call to segmentDownloaded() so switchCallback() is
+    // called.
+    abrManager.segmentDownloaded(1000, bytesPerSecond);
 
-        // Expect variants 4 to be chosen
-        let expectedVariant = variants[4];
+    // Expect variants 4 to be chosen
+    const expectedVariant = variants[4];
 
-        expect(switchCallback).toHaveBeenCalledWith(expectedVariant);
-      });
+    expect(switchCallback).toHaveBeenCalledWith(expectedVariant);
+  });
 
-  it('does not call switchCallback() if not enabled', function() {
-    let bandwidth = 5e5;
-    let bytesPerSecond =
-        sufficientBWMultiplier * bandwidth / 8.0;
+  it('does not call switchCallback() if not enabled', () => {
+    const bandwidth = 5e5;
+    const bytesPerSecond = sufficientBWMultiplier * bandwidth / 8.0;
 
     abrManager.setVariants(variants);
     abrManager.chooseVariant();
@@ -231,10 +231,9 @@ describe('SimpleAbrManager', function() {
     expect(switchCallback).not.toHaveBeenCalled();
   });
 
-  it('does not call switchCallback() in switch interval', function() {
+  it('does not call switchCallback() in switch interval', () => {
     let bandwidth = 5e5;
-    let bytesPerSecond =
-        sufficientBWMultiplier * bandwidth / 8.0;
+    let bytesPerSecond = sufficientBWMultiplier * bandwidth / 8.0;
 
     abrManager.setVariants(variants);
     abrManager.chooseVariant();
@@ -250,8 +249,7 @@ describe('SimpleAbrManager', function() {
 
     // Simulate drop in bandwidth.
     bandwidth = 2e6;
-    bytesPerSecond =
-        sufficientBWMultiplier * bandwidth / 8.0;
+    bytesPerSecond = sufficientBWMultiplier * bandwidth / 8.0;
 
     abrManager.segmentDownloaded(1000, bytesPerSecond);
     abrManager.segmentDownloaded(1000, bytesPerSecond);
@@ -274,12 +272,11 @@ describe('SimpleAbrManager', function() {
     expect(switchCallback).toHaveBeenCalled();
   });
 
-  it('does not clear the buffer on upgrade', function() {
+  it('does not clear the buffer on upgrade', () => {
     // Simulate some segments being downloaded at a high rate, to trigger an
     // upgrade.
-    let bandwidth = 5e5;
-    let bytesPerSecond =
-        sufficientBWMultiplier * bandwidth / 8.0;
+    const bandwidth = 5e5;
+    const bytesPerSecond = sufficientBWMultiplier * bandwidth / 8.0;
 
     abrManager.setVariants(variants);
     abrManager.chooseVariant();
@@ -298,12 +295,11 @@ describe('SimpleAbrManager', function() {
     expect(switchCallback).toHaveBeenCalledWith(jasmine.any(Object));
   });
 
-  it('does not clear the buffer on downgrade', function() {
+  it('does not clear the buffer on downgrade', () => {
     // Simulate some segments being downloaded at a low rate, to trigger a
     // downgrade.
-    let bandwidth = 5e5;
-    let bytesPerSecond =
-        sufficientBWMultiplier * bandwidth / 8.0;
+    const bandwidth = 5e5;
+    const bytesPerSecond = sufficientBWMultiplier * bandwidth / 8.0;
 
     // Set the default high so that the initial choice will be high-quality.
     config.defaultBandwidthEstimate = 4e6;
@@ -326,14 +322,16 @@ describe('SimpleAbrManager', function() {
     expect(switchCallback).toHaveBeenCalledWith(jasmine.any(Object));
   });
 
-  it('will respect restrictions', function() {
+  it('will respect restrictions', () => {
+    /* eslint-disable indent */
     manifest = new shaka.test.ManifestGenerator()
-      .addPeriod(0)
-        .addVariant(10).bandwidth(1e5)
-          .addVideo(0).size(50, 50)
-        .addVariant(11).bandwidth(2e5)
-          .addVideo(1).size(200, 200)
-      .build();
+        .addPeriod(0)
+          .addVariant(10).bandwidth(1e5)
+            .addVideo(0).size(50, 50)
+          .addVariant(11).bandwidth(2e5)
+            .addVideo(1).size(200, 200)
+        .build();
+    /* eslint-enable indent */
 
     abrManager.setVariants(manifest.periods[0].variants);
     let chosen = abrManager.chooseVariant();
@@ -347,13 +345,15 @@ describe('SimpleAbrManager', function() {
   });
 
   it('uses lowest-bandwidth variant when restrictions cannot be met', () => {
+    /* eslint-disable indent */
     manifest = new shaka.test.ManifestGenerator()
-      .addPeriod(0)
-        .addVariant(10).bandwidth(1e5)
-          .addVideo(0).size(50, 50)
-        .addVariant(11).bandwidth(2e5)
-          .addVideo(1).size(200, 200)
-      .build();
+        .addPeriod(0)
+          .addVariant(10).bandwidth(1e5)
+            .addVideo(0).size(50, 50)
+          .addVariant(11).bandwidth(2e5)
+            .addVideo(1).size(200, 200)
+        .build();
+    /* eslint-enable indent */
 
     abrManager.setVariants(manifest.periods[0].variants);
     let chosen = abrManager.chooseVariant();

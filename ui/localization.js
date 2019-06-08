@@ -145,7 +145,7 @@ shaka.ui.Localization = class {
     if (missing.length) {
       /** @type {shaka.ui.Localization.UnknownLocalesEvent} */
       const e = {
-        locales: missing,
+        'locales': missing,
       };
 
       this.events_.dispatchEvent(new shaka.util.FakeEvent(
@@ -320,7 +320,9 @@ shaka.ui.Localization = class {
       // Sort the siblings so that they will always appear in the same order
       // regardless of the order of |localizations|.
       siblings.sort();
-      for (const locale of siblings) { localeOrder.add(locale); }
+      for (const locale of siblings) {
+        localeOrder.add(locale);
+      }
 
       const children = shaka.util.Iterables.filter(
           localizations.keys(),
@@ -329,7 +331,9 @@ shaka.ui.Localization = class {
       // Sort the children so that they will always appear in the same order
       // regardless of the order of |localizations|.
       children.sort();
-      for (const locale of children) { localeOrder.add(locale); }
+      for (const locale of children) {
+        localeOrder.add(locale);
+      }
     }
 
     // Finally we add our fallback (something that should have all expected
@@ -340,7 +344,9 @@ shaka.ui.Localization = class {
     const mergeOrder = [];
     for (const locale of localeOrder) {
       const map = localizations.get(locale);
-      if (map) { mergeOrder.push(map); }
+      if (map) {
+        mergeOrder.push(map);
+      }
     }
 
     // We need to reverse the merge order. We build the order based on most
@@ -377,10 +383,10 @@ shaka.ui.Localization = class {
       /** @type {shaka.ui.Localization.MissingLocalizationsEvent} */
       const e = {
         // Make a copy of the preferred locales to avoid leaking references.
-        locales: Array.from(preferredLocales),
+        'locales': Array.from(preferredLocales),
         // Because most people like arrays more than sets, convert the set to
         // an array.
-        missing: Array.from(missing),
+        'missing': Array.from(missing),
       };
 
       this.events_.dispatchEvent(new shaka.util.FakeEvent(
@@ -429,6 +435,7 @@ shaka.ui.Localization.ConflictResolution = {
  * matches it has.
  *
  * @const {string}
+ * @export
  */
 shaka.ui.Localization.UNKNOWN_LOCALES = 'unknown-locales';
 
@@ -437,6 +444,7 @@ shaka.ui.Localization.UNKNOWN_LOCALES = 'unknown-locales';
  * related locales, or the fallback locale.
  *
  * @const {string}
+ * @export
  */
 shaka.ui.Localization.UNKNOWN_LOCALIZATION = 'unknown-localization';
 
@@ -446,6 +454,7 @@ shaka.ui.Localization.UNKNOWN_LOCALIZATION = 'unknown-localization';
  * locale.
  *
  * @const {string}
+ * @export
  */
 shaka.ui.Localization.MISSING_LOCALIZATIONS = 'missing-localizations';
 
@@ -454,6 +463,7 @@ shaka.ui.Localization.MISSING_LOCALIZATIONS = 'missing-localizations';
  * resolved values should be updated.
  *
  * @const {string}
+ * @export
  */
 shaka.ui.Localization.LOCALE_CHANGED = 'locale-changed';
 
@@ -462,6 +472,7 @@ shaka.ui.Localization.LOCALE_CHANGED = 'locale-changed';
  * affect previously resolved values.
  *
  * @const {string}
+ * @export
  */
 shaka.ui.Localization.LOCALE_UPDATED = 'locale-updated';
 

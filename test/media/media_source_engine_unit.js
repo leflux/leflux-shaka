@@ -44,7 +44,7 @@ let MockTimeRanges;
 let MockSourceBuffer;
 
 
-describe('MediaSourceEngine', function() {
+describe('MediaSourceEngine', () => {
   const Util = shaka.test.Util;
   const ContentType = shaka.util.ManifestParserUtils.ContentType;
 
@@ -84,40 +84,38 @@ describe('MediaSourceEngine', function() {
   /** @type {!shaka.media.MediaSourceEngine} */
   let mediaSourceEngine;
 
-  beforeAll(function() {
+  beforeAll(() => {
     // Since this is not an integration test, we don't want MediaSourceEngine to
     // fail assertions based on browser support for types.  Pretend that all
     // video and audio types are supported.
-    window.MediaSource.isTypeSupported = function(mimeType) {
-      let type = mimeType.split('/')[0];
+    window.MediaSource.isTypeSupported = (mimeType) => {
+      const type = mimeType.split('/')[0];
       return type == 'video' || type == 'audio';
     };
 
-    shaka.text.TextEngine = createMockTextEngineCtor();
-    shaka.media.Transmuxer.isSupported = function(mimeType, contentType) {
+    shaka.media.Transmuxer.isSupported = (mimeType, contentType) => {
       return mimeType == 'tsMimetype';
     };
   });
 
-  afterAll(function() {
+  afterAll(() => {
     window.MediaSource.isTypeSupported = originalIsTypeSupported;
-    shaka.text.TextEngine = originalTextEngine;
-    shaka.media.MediaSourceEngine.prototype.createMediaSource =
-        originalCreateMediaSource;
     shaka.media.Transmuxer.isSupported = originalTransmuxerIsSupported;
   });
 
-  beforeEach(/** @suppress {invalidCasts} */ function() {
+  beforeEach(/** @suppress {invalidCasts} */ () => {
     audioSourceBuffer = createMockSourceBuffer();
     videoSourceBuffer = createMockSourceBuffer();
     mockMediaSource = createMockMediaSource();
-    mockMediaSource.addSourceBuffer.and.callFake(function(mimeType) {
-      let type = mimeType.split('/')[0];
+    mockMediaSource.addSourceBuffer.and.callFake((mimeType) => {
+      const type = mimeType.split('/')[0];
       return type == 'audio' ? audioSourceBuffer : videoSourceBuffer;
     });
 
+    shaka.text.TextEngine = createMockTextEngineCtor();
+
     createMediaSourceSpy = jasmine.createSpy('createMediaSource');
-    createMediaSourceSpy.and.callFake(function(p) {
+    createMediaSourceSpy.and.callFake((p) => {
       p.resolve();
       return mockMediaSource;
     });
@@ -136,15 +134,15 @@ describe('MediaSourceEngine', function() {
       buffered: {
         length: 0,
       },
-      removeAttribute: /** @this {HTMLVideoElement} */ function(attr) {
+      removeAttribute: /** @this {HTMLVideoElement} */ (attr) => {
         // Only called with attr == 'src'.
         // This assertion alerts us if the requirements for this mock change.
         goog.asserts.assert(attr == 'src', 'Unexpected removeAttribute() call');
-        this.src = '';
+        mockVideo.src = '';
       },
-      load: /** @this {HTMLVideoElement} */ function() {
+      load: /** @this {HTMLVideoElement} */ () => {
         // This assertion alerts us if the requirements for this mock change.
-        goog.asserts.assert(this.src == '', 'Unexpected load() call');
+        goog.asserts.assert(mockVideo.src == '', 'Unexpected load() call');
       },
     };
     video = /** @type {HTMLMediaElement} */(mockVideo);
@@ -156,11 +154,14 @@ describe('MediaSourceEngine', function() {
         mockTextDisplayer);
   });
 
-  afterEach(function() {
+  afterEach(() => {
     mockTextEngine = null;
+    shaka.text.TextEngine = originalTextEngine;
+    shaka.media.MediaSourceEngine.prototype.createMediaSource =
+        originalCreateMediaSource;
   });
 
-  describe('constructor', function() {
+  describe('constructor', () => {
     const originalCreateObjectURL =
       shaka.media.MediaSourceEngine.createObjectURL;
     const originalMediaSource = window.MediaSource;
@@ -180,20 +181,21 @@ describe('MediaSourceEngine', function() {
       shaka.media.MediaSourceEngine.createObjectURL =
         Util.spyFunc(createObjectURLSpy);
 
-      let mediaSourceSpy = jasmine.createSpy('MediaSource').and.callFake(() => {
-        return mockMediaSource;
-      });
+      const mediaSourceSpy =
+          jasmine.createSpy('MediaSource').and.callFake(() => {
+            return mockMediaSource;
+          });
       window.MediaSource = Util.spyFunc(mediaSourceSpy);
 
       await mediaSourceEngine.destroy();
     });
 
-    afterAll(function() {
+    afterAll(() => {
       shaka.media.MediaSourceEngine.createObjectURL = originalCreateObjectURL;
       window.MediaSource = originalMediaSource;
     });
 
-    it('creates a MediaSource object and sets video.src', function() {
+    it('creates a MediaSource object and sets video.src', () => {
       mediaSourceEngine = new shaka.media.MediaSourceEngine(
           video,
           new shaka.test.FakeClosedCaptionParser(),
@@ -205,7 +207,7 @@ describe('MediaSourceEngine', function() {
     });
   });
 
-  describe('init', function() {
+  describe('init', () => {
     it('creates SourceBuffers for the given types', async () => {
       const initObject = new Map();
       initObject.set(ContentType.AUDIO, fakeAudioStream);
@@ -225,7 +227,7 @@ describe('MediaSourceEngine', function() {
     });
   });
 
-  describe('bufferStart and bufferEnd', function() {
+  describe('bufferStart and bufferEnd', () => {
     beforeEach(async () => {
       const initObject = new Map();
       initObject.set(ContentType.AUDIO, fakeAudioStream);
@@ -233,14 +235,14 @@ describe('MediaSourceEngine', function() {
       await mediaSourceEngine.init(initObject, false);
     });
 
-    it('returns correct timestamps for one range', function() {
+    it('returns correct timestamps for one range', () => {
       audioSourceBuffer.buffered = createFakeBuffered([{start: 0, end: 10}]);
 
       expect(mediaSourceEngine.bufferStart(ContentType.AUDIO)).toBeCloseTo(0);
       expect(mediaSourceEngine.bufferEnd(ContentType.AUDIO)).toBeCloseTo(10);
     });
 
-    it('returns correct timestamps for multiple ranges', function() {
+    it('returns correct timestamps for multiple ranges', () => {
       audioSourceBuffer.buffered =
           createFakeBuffered([{start: 5, end: 10}, {start: 20, end: 30}]);
 
@@ -248,14 +250,14 @@ describe('MediaSourceEngine', function() {
       expect(mediaSourceEngine.bufferEnd(ContentType.AUDIO)).toBeCloseTo(30);
     });
 
-    it('returns null if there are no ranges', function() {
+    it('returns null if there are no ranges', () => {
       audioSourceBuffer.buffered = createFakeBuffered([]);
 
       expect(mediaSourceEngine.bufferStart(ContentType.AUDIO)).toBeNull();
       expect(mediaSourceEngine.bufferEnd(ContentType.AUDIO)).toBeNull();
     });
 
-    it('will forward to TextEngine', function() {
+    it('will forward to TextEngine', () => {
       mockTextEngine.bufferStart.and.returnValue(10);
       mockTextEngine.bufferEnd.and.returnValue(20);
 
@@ -269,7 +271,7 @@ describe('MediaSourceEngine', function() {
     });
   });
 
-  describe('bufferedAheadOf', function() {
+  describe('bufferedAheadOf', () => {
     beforeEach(async () => {
       const initObject = new Map();
       initObject.set(ContentType.AUDIO, fakeAudioStream);
@@ -277,7 +279,7 @@ describe('MediaSourceEngine', function() {
       await mediaSourceEngine.init(initObject, false);
     });
 
-    it('returns the amount of data ahead of the given position', function() {
+    it('returns the amount of data ahead of the given position', () => {
       audioSourceBuffer.buffered = createFakeBuffered([{start: 0, end: 10}]);
 
       expect(mediaSourceEngine.bufferedAheadOf(ContentType.AUDIO, 0))
@@ -288,7 +290,7 @@ describe('MediaSourceEngine', function() {
           .toBeCloseTo(0.1);
     });
 
-    it('returns zero when given an unbuffered time', function() {
+    it('returns zero when given an unbuffered time', () => {
       audioSourceBuffer.buffered = createFakeBuffered([{start: 5, end: 10}]);
 
       expect(mediaSourceEngine.bufferedAheadOf(ContentType.AUDIO, 10))
@@ -297,7 +299,7 @@ describe('MediaSourceEngine', function() {
           .toBeCloseTo(0);
     });
 
-    it('returns the correct amount with multiple ranges', function() {
+    it('returns the correct amount with multiple ranges', () => {
       audioSourceBuffer.buffered =
           createFakeBuffered([{start: 1, end: 3}, {start: 6, end: 10}]);
 
@@ -318,7 +320,7 @@ describe('MediaSourceEngine', function() {
           .toBeCloseTo(0.1);
     });
 
-    it('will forward to TextEngine', function() {
+    it('will forward to TextEngine', () => {
       mockTextEngine.bufferedAheadOf.and.returnValue(10);
 
       expect(mockTextEngine.bufferedAheadOf).not.toHaveBeenCalled();
@@ -327,7 +329,7 @@ describe('MediaSourceEngine', function() {
     });
   });
 
-  describe('appendBuffer', function() {
+  describe('appendBuffer', () => {
     beforeEach(async () => {
       captureEvents(audioSourceBuffer, ['updateend', 'error']);
       captureEvents(videoSourceBuffer, ['updateend', 'error']);
@@ -340,7 +342,7 @@ describe('MediaSourceEngine', function() {
 
     it('appends the given data', async () => {
       /** @type {!shaka.test.StatusPromise} */
-      let p = new shaka.test.StatusPromise(mediaSourceEngine.appendBuffer(
+      const p = new shaka.test.StatusPromise(mediaSourceEngine.appendBuffer(
           ContentType.AUDIO, buffer, null, null,
           /* hasClosedCaptions */ false));
       expect(audioSourceBuffer.appendBuffer).toHaveBeenCalledWith(buffer);
@@ -351,60 +353,61 @@ describe('MediaSourceEngine', function() {
     it('rejects promise when operation throws', async () => {
       audioSourceBuffer.appendBuffer.and.throwError('fail!');
       mockVideo.error = {code: 5};
-      try {
-        await mediaSourceEngine.appendBuffer(ContentType.AUDIO, buffer, null,
-          null, /* hasClosedCaptions */ false);
-        fail('not reached');
-      } catch (error) {
-        expect(error.code).toBe(
-            shaka.util.Error.Code.MEDIA_SOURCE_OPERATION_THREW);
-        expect(error.data).toEqual(
-            [jasmine.objectContaining({message: 'fail!'})]);
-        expect(audioSourceBuffer.appendBuffer).toHaveBeenCalledWith(buffer);
-      }
+      const expected = Util.jasmineError(new shaka.util.Error(
+          shaka.util.Error.Severity.CRITICAL,
+          shaka.util.Error.Category.MEDIA,
+          shaka.util.Error.Code.MEDIA_SOURCE_OPERATION_THREW,
+          jasmine.objectContaining({message: 'fail!'})));
+      await expectAsync(
+          mediaSourceEngine.appendBuffer(
+              ContentType.AUDIO, buffer, null, null,
+              /* hasClosedCaptions */ false))
+          .toBeRejectedWith(expected);
+      expect(audioSourceBuffer.appendBuffer).toHaveBeenCalledWith(buffer);
     });
 
     it('rejects promise when op. throws QuotaExceededError', async () => {
-      let fakeDOMException = {name: 'QuotaExceededError'};
-      audioSourceBuffer.appendBuffer.and.callFake(function() {
+      const fakeDOMException = {name: 'QuotaExceededError'};
+      audioSourceBuffer.appendBuffer.and.callFake(() => {
         throw fakeDOMException;
       });
       mockVideo.error = {code: 5};
-      try {
-        await mediaSourceEngine.appendBuffer(ContentType.AUDIO, buffer, null,
-          null, /* hasClosedCaptions */ false);
-        fail('not reached');
-      } catch (error) {
-        expect(error.code).toBe(shaka.util.Error.Code.QUOTA_EXCEEDED_ERROR);
-        expect(error.data).toEqual([ContentType.AUDIO]);
-        expect(audioSourceBuffer.appendBuffer).toHaveBeenCalledWith(buffer);
-      }
+      const expected = Util.jasmineError(new shaka.util.Error(
+          shaka.util.Error.Severity.CRITICAL,
+          shaka.util.Error.Category.MEDIA,
+          shaka.util.Error.Code.QUOTA_EXCEEDED_ERROR,
+          ContentType.AUDIO));
+      await expectAsync(
+          mediaSourceEngine.appendBuffer(
+              ContentType.AUDIO, buffer, null, null,
+              /* hasClosedCaptions */ false))
+          .toBeRejectedWith(expected);
+      expect(audioSourceBuffer.appendBuffer).toHaveBeenCalledWith(buffer);
     });
 
-    it('rejects the promise if this operation fails async', function(done) {
+    it('rejects the promise if this operation fails async', async () => {
       mockVideo.error = {code: 5};
-      mediaSourceEngine.appendBuffer(ContentType.AUDIO, buffer, null, null,
-          /* hasClosedCaptions */ false).then(function() {
-            fail('not reached');
-            done();
-          }, function(error) {
-            expect(error.code).toBe(
-                shaka.util.Error.Code.MEDIA_SOURCE_OPERATION_FAILED);
-            expect(error.data).toEqual([5]);
-            expect(audioSourceBuffer.appendBuffer).toHaveBeenCalledWith(buffer);
-            done();
-          });
+      const p = mediaSourceEngine.appendBuffer(
+          ContentType.AUDIO, buffer, null, null, /* hasClosedCaptions */ false);
       audioSourceBuffer.error();
       audioSourceBuffer.updateend();
+
+      const expected = Util.jasmineError(new shaka.util.Error(
+          shaka.util.Error.Severity.CRITICAL,
+          shaka.util.Error.Category.MEDIA,
+          shaka.util.Error.Code.MEDIA_SOURCE_OPERATION_FAILED,
+          5));
+      await expectAsync(p).toBeRejectedWith(expected);
+      expect(audioSourceBuffer.appendBuffer).toHaveBeenCalledWith(buffer);
     });
 
     it('queues operations on a single SourceBuffer', async () => {
       /** @type {!shaka.test.StatusPromise} */
-      let p1 = new shaka.test.StatusPromise(mediaSourceEngine.appendBuffer(
+      const p1 = new shaka.test.StatusPromise(mediaSourceEngine.appendBuffer(
           ContentType.AUDIO, buffer, null, null,
           /* hasClosedCaptions */ false));
       /** @type {!shaka.test.StatusPromise} */
-      let p2 = new shaka.test.StatusPromise(mediaSourceEngine.appendBuffer(
+      const p2 = new shaka.test.StatusPromise(mediaSourceEngine.appendBuffer(
           ContentType.AUDIO, buffer2, null, null,
           /* hasClosedCaptions */ false));
 
@@ -423,15 +426,15 @@ describe('MediaSourceEngine', function() {
 
     it('queues operations independently for different types', async () => {
       /** @type {!shaka.test.StatusPromise} */
-      let p1 = new shaka.test.StatusPromise(mediaSourceEngine.appendBuffer(
+      const p1 = new shaka.test.StatusPromise(mediaSourceEngine.appendBuffer(
           ContentType.AUDIO, buffer, null, null,
           /* hasClosedCaptions */ false));
       /** @type {!shaka.test.StatusPromise} */
-      let p2 = new shaka.test.StatusPromise(mediaSourceEngine.appendBuffer(
+      const p2 = new shaka.test.StatusPromise(mediaSourceEngine.appendBuffer(
           ContentType.AUDIO, buffer2, null, null,
           /* hasClosedCaptions */ false));
       /** @type {!shaka.test.StatusPromise} */
-      let p3 = new shaka.test.StatusPromise(mediaSourceEngine.appendBuffer(
+      const p3 = new shaka.test.StatusPromise(mediaSourceEngine.appendBuffer(
           ContentType.VIDEO, buffer3, null, null,
           /* hasClosedCaptions */ false));
 
@@ -454,28 +457,28 @@ describe('MediaSourceEngine', function() {
     });
 
     it('continues if an operation throws', async () => {
-      audioSourceBuffer.appendBuffer.and.callFake(function(value) {
+      audioSourceBuffer.appendBuffer.and.callFake((value) => {
         if (value == 2) {
           // throw synchronously.
           throw new Error();
         } else {
           // complete successfully asynchronously.
-          Promise.resolve().then(function() {
+          Promise.resolve().then(() => {
             audioSourceBuffer.updateend();
           });
         }
       });
 
       /** @type {!shaka.test.StatusPromise} */
-      let p1 = new shaka.test.StatusPromise(mediaSourceEngine.appendBuffer(
+      const p1 = new shaka.test.StatusPromise(mediaSourceEngine.appendBuffer(
           ContentType.AUDIO, buffer, null, null,
           /* hasClosedCaptions */ false));
       /** @type {!shaka.test.StatusPromise} */
-      let p2 = new shaka.test.StatusPromise(mediaSourceEngine.appendBuffer(
+      const p2 = new shaka.test.StatusPromise(mediaSourceEngine.appendBuffer(
           ContentType.AUDIO, buffer2, null, null,
           /* hasClosedCaptions */ false));
       /** @type {!shaka.test.StatusPromise} */
-      let p3 = new shaka.test.StatusPromise(mediaSourceEngine.appendBuffer(
+      const p3 = new shaka.test.StatusPromise(mediaSourceEngine.appendBuffer(
           ContentType.AUDIO, buffer3, null, null,
           /* hasClosedCaptions */ false));
 
@@ -489,7 +492,7 @@ describe('MediaSourceEngine', function() {
     });
 
     it('forwards to TextEngine', async () => {
-      let data = new ArrayBuffer(0);
+      const data = new ArrayBuffer(0);
       expect(mockTextEngine.appendBuffer).not.toHaveBeenCalled();
       await mediaSourceEngine.appendBuffer(
           ContentType.TEXT, data, 0, 10, /* hasClosedCaptions */ false);
@@ -497,47 +500,52 @@ describe('MediaSourceEngine', function() {
           data, 0, 10);
     });
 
-    it('appends transmuxed data and captions', function(done) {
+    it('appends transmuxed data and captions', async () => {
       const initObject = new Map();
       initObject.set(ContentType.VIDEO, fakeTransportStream);
 
-      mediaSourceEngine.init(initObject, false).then(() => {
-        return mediaSourceEngine.appendBuffer(
+      const init = async () => {
+        await mediaSourceEngine.init(initObject, false);
+        await mediaSourceEngine.appendBuffer(
             ContentType.VIDEO, buffer, null, null,
             /* hasClosedCaptions */ false);
-      }).then(() => {
         expect(mockTextEngine.storeAndAppendClosedCaptions).toHaveBeenCalled();
         expect(videoSourceBuffer.appendBuffer).toHaveBeenCalled();
-      }).catch(fail).then(done);
+      };
 
       // The 'updateend' event fires once the data is done appending to the
       // media source.  We only append to the media source once transmuxing is
       // done.  Since transmuxing is done using Promises, we need to delay the
       // event until MediaSourceEngine calls appendBuffer.
-      Util.delay(0.1).then(function() {
+      const delay = async () => {
+        await Util.delay(0.1);
         videoSourceBuffer.updateend();
-      });
+      };
+      await Promise.all([init(), delay()]);
     });
 
-    it('appends only transmuxed data without embedded text', function(done) {
+    it('appends only transmuxed data without embedded text', async () => {
       const initObject = new Map();
       initObject.set(ContentType.VIDEO, fakeTransportStream);
 
-      mediaSourceEngine.init(initObject, false).then(() => {
-        return mediaSourceEngine.appendBuffer(ContentType.VIDEO, buffer, null,
-            null, /* hasClosedCaptions */ false);
-      }).then(() => {
+      const init = async () => {
+        await mediaSourceEngine.init(initObject, false);
+        await mediaSourceEngine.appendBuffer(
+            ContentType.VIDEO, buffer, null, null,
+            /* hasClosedCaptions */ false);
         expect(mockTextEngine.appendCues).not.toHaveBeenCalled();
         expect(videoSourceBuffer.appendBuffer).toHaveBeenCalled();
-      }).catch(fail).then(done);
+      };
 
       // The 'updateend' event fires once the data is done appending to the
       // media source.  We only append to the media source once transmuxing is
       // done.  Since transmuxing is done using Promises, we need to delay the
       // event until MediaSourceEngine calls appendBuffer.
-      Util.delay(0.1).then(function() {
+      const delay = async () => {
+        await Util.delay(0.1);
         videoSourceBuffer.updateend();
-      });
+      };
+      await Promise.all([init(), delay()]);
     });
 
     it('appends parsed closed captions from CaptionParser', async () => {
@@ -562,8 +570,8 @@ describe('MediaSourceEngine', function() {
       videoSourceBuffer.updateend();
       await appendInit;
 
-      expect(mockTextEngine.storeAndAppendClosedCaptions).not.
-          toHaveBeenCalled();
+      expect(mockTextEngine.storeAndAppendClosedCaptions).not
+          .toHaveBeenCalled();
       // Parse and append the closed captions embedded in video stream.
       const appendVideo = mediaSourceEngine.appendBuffer(
           ContentType.VIDEO, buffer, 0, Infinity, true);
@@ -575,34 +583,34 @@ describe('MediaSourceEngine', function() {
 
     it('appends closed caption data only when mux.js is available',
         async () => {
-      const originalMuxjs = window.muxjs;
+          const originalMuxjs = window.muxjs;
 
-      try {
-        window['muxjs'] = null;
-        const initObject = new Map();
-        initObject.set(ContentType.VIDEO, fakeVideoStream);
-        await mediaSourceEngine.init(initObject, false);
+          try {
+            window['muxjs'] = null;
+            const initObject = new Map();
+            initObject.set(ContentType.VIDEO, fakeVideoStream);
+            await mediaSourceEngine.init(initObject, false);
 
-        const appendBuffer = mediaSourceEngine.appendBuffer(
-            ContentType.VIDEO, buffer, null, null, true);
-        // In MediaSourceEngine, appendBuffer() is async and Promise-based, but
-        // at the browser level, it's event-based.
-        // MediaSourceEngine waits for the 'updateend' event from the
-        // SourceBuffer, and uses that to resolve the appendBuffer Promise.
-        // Here, we must trigger the event on the fake/mock SourceBuffer before
-        // waiting on the appendBuffer Promise.
-        videoSourceBuffer.updateend();
-        await appendBuffer;
-        expect(mockClosedCaptionParser.initSpy).not.toHaveBeenCalled();
-        expect(mockTextEngine.storeAndAppendClosedCaptions).not.
-            toHaveBeenCalled();
-      } finally {
-        window['muxjs'] = originalMuxjs;
-      }
-    });
+            const appendBuffer = mediaSourceEngine.appendBuffer(
+                ContentType.VIDEO, buffer, null, null, true);
+            // In MediaSourceEngine, appendBuffer() is async and Promise-based,
+            // but at the browser level, it's event-based. MediaSourceEngine
+            // waits for the 'updateend' event from the SourceBuffer, and uses
+            // that to resolve the appendBuffer Promise. Here, we must trigger
+            // the event on the fake/mock SourceBuffer before waiting on the
+            // appendBuffer Promise.
+            videoSourceBuffer.updateend();
+            await appendBuffer;
+            expect(mockClosedCaptionParser.initSpy).not.toHaveBeenCalled();
+            expect(mockTextEngine.storeAndAppendClosedCaptions).not
+                .toHaveBeenCalled();
+          } finally {
+            window['muxjs'] = originalMuxjs;
+          }
+        });
   });
 
-  describe('remove', function() {
+  describe('remove', () => {
     beforeEach(async () => {
       captureEvents(audioSourceBuffer, ['updateend', 'error']);
       captureEvents(videoSourceBuffer, ['updateend', 'error']);
@@ -613,51 +621,49 @@ describe('MediaSourceEngine', function() {
       await mediaSourceEngine.init(initObject, false);
     });
 
-    it('removes the given data', function(done) {
-      mediaSourceEngine.remove(ContentType.AUDIO, 1, 5).then(function() {
-        expect(audioSourceBuffer.remove).toHaveBeenCalledWith(1, 5);
-        done();
-      });
+    it('removes the given data', async () => {
+      const p = mediaSourceEngine.remove(ContentType.AUDIO, 1, 5);
       audioSourceBuffer.updateend();
+
+      await p;
+      expect(audioSourceBuffer.remove).toHaveBeenCalledWith(1, 5);
     });
 
     it('rejects promise when operation throws', async () => {
       audioSourceBuffer.remove.and.throwError('fail!');
       mockVideo.error = {code: 5};
-      try {
-        await mediaSourceEngine.remove(ContentType.AUDIO, 1, 5);
-        fail('not reached');
-      } catch (error) {
-        expect(error.code).toBe(
-            shaka.util.Error.Code.MEDIA_SOURCE_OPERATION_THREW);
-        expect(error.data).toEqual(
-            [jasmine.objectContaining({message: 'fail!'})]);
-        expect(audioSourceBuffer.remove).toHaveBeenCalledWith(1, 5);
-      }
+
+      const expected = Util.jasmineError(new shaka.util.Error(
+          shaka.util.Error.Severity.CRITICAL,
+          shaka.util.Error.Category.MEDIA,
+          shaka.util.Error.Code.MEDIA_SOURCE_OPERATION_THREW,
+          jasmine.objectContaining({message: 'fail!'})));
+      await expectAsync(mediaSourceEngine.remove(ContentType.AUDIO, 1, 5))
+          .toBeRejectedWith(expected);
+      expect(audioSourceBuffer.remove).toHaveBeenCalledWith(1, 5);
     });
 
-    it('rejects the promise if this operation fails async', function(done) {
+    it('rejects the promise if this operation fails async', async () => {
       mockVideo.error = {code: 5};
-      mediaSourceEngine.remove(ContentType.AUDIO, 1, 5).then(function() {
-        fail('not reached');
-        done();
-      }, function(error) {
-        expect(error.code).toBe(
-            shaka.util.Error.Code.MEDIA_SOURCE_OPERATION_FAILED);
-        expect(error.data).toEqual([5]);
-        expect(audioSourceBuffer.remove).toHaveBeenCalledWith(1, 5);
-        done();
-      });
+      const p = mediaSourceEngine.remove(ContentType.AUDIO, 1, 5);
       audioSourceBuffer.error();
       audioSourceBuffer.updateend();
+
+      const expected = Util.jasmineError(new shaka.util.Error(
+          shaka.util.Error.Severity.CRITICAL,
+          shaka.util.Error.Category.MEDIA,
+          shaka.util.Error.Code.MEDIA_SOURCE_OPERATION_FAILED,
+          5));
+      await expectAsync(p).toBeRejectedWith(expected);
+      expect(audioSourceBuffer.remove).toHaveBeenCalledWith(1, 5);
     });
 
     it('queues operations on a single SourceBuffer', async () => {
       /** @type {!shaka.test.StatusPromise} */
-      let p1 = new shaka.test.StatusPromise(
+      const p1 = new shaka.test.StatusPromise(
           mediaSourceEngine.remove(ContentType.AUDIO, 1, 5));
       /** @type {!shaka.test.StatusPromise} */
-      let p2 = new shaka.test.StatusPromise(
+      const p2 = new shaka.test.StatusPromise(
           mediaSourceEngine.remove(ContentType.AUDIO, 6, 10));
 
       expect(audioSourceBuffer.remove).toHaveBeenCalledWith(1, 5);
@@ -675,13 +681,13 @@ describe('MediaSourceEngine', function() {
 
     it('queues operations independently for different types', async () => {
       /** @type {!shaka.test.StatusPromise} */
-      let p1 = new shaka.test.StatusPromise(
+      const p1 = new shaka.test.StatusPromise(
           mediaSourceEngine.remove(ContentType.AUDIO, 1, 5));
       /** @type {!shaka.test.StatusPromise} */
-      let p2 = new shaka.test.StatusPromise(
+      const p2 = new shaka.test.StatusPromise(
           mediaSourceEngine.remove(ContentType.AUDIO, 6, 10));
       /** @type {!shaka.test.StatusPromise} */
-      let p3 = new shaka.test.StatusPromise(
+      const p3 = new shaka.test.StatusPromise(
           mediaSourceEngine.remove(ContentType.VIDEO, 3, 8));
 
       expect(audioSourceBuffer.remove).toHaveBeenCalledWith(1, 5);
@@ -702,26 +708,26 @@ describe('MediaSourceEngine', function() {
     });
 
     it('continues if an operation throws', async () => {
-      audioSourceBuffer.remove.and.callFake(function(start, end) {
+      audioSourceBuffer.remove.and.callFake((start, end) => {
         if (start == 2) {
           // throw synchronously.
           throw new Error();
         } else {
           // complete successfully asynchronously.
-          Promise.resolve().then(function() {
+          Promise.resolve().then(() => {
             audioSourceBuffer.updateend();
           });
         }
       });
 
       /** @type {!shaka.test.StatusPromise} */
-      let p1 = new shaka.test.StatusPromise(
+      const p1 = new shaka.test.StatusPromise(
           mediaSourceEngine.remove(ContentType.AUDIO, 1, 2));
       /** @type {!shaka.test.StatusPromise} */
-      let p2 = new shaka.test.StatusPromise(
+      const p2 = new shaka.test.StatusPromise(
           mediaSourceEngine.remove(ContentType.AUDIO, 2, 3));
       /** @type {!shaka.test.StatusPromise} */
-      let p3 = new shaka.test.StatusPromise(
+      const p3 = new shaka.test.StatusPromise(
           mediaSourceEngine.remove(ContentType.AUDIO, 3, 4));
 
       await Util.delay(0.1);
@@ -740,7 +746,7 @@ describe('MediaSourceEngine', function() {
     });
   });
 
-  describe('clear', function() {
+  describe('clear', () => {
     beforeEach(async () => {
       captureEvents(audioSourceBuffer, ['updateend', 'error']);
       captureEvents(videoSourceBuffer, ['updateend', 'error']);
@@ -751,18 +757,18 @@ describe('MediaSourceEngine', function() {
       await mediaSourceEngine.init(initObject, false);
     });
 
-    it('clears the given data', function(done) {
+    it('clears the given data', async () => {
       mockMediaSource.durationGetter_.and.returnValue(20);
-      mediaSourceEngine.clear(ContentType.AUDIO).then(function() {
-        expect(audioSourceBuffer.remove.calls.count()).toBe(1);
-        expect(audioSourceBuffer.remove.calls.argsFor(0)[0]).toBe(0);
-        expect(audioSourceBuffer.remove.calls.argsFor(0)[1] >= 20).toBeTruthy();
-        done();
-      });
+      const p = mediaSourceEngine.clear(ContentType.AUDIO);
       audioSourceBuffer.updateend();
+
+      await p;
+      expect(audioSourceBuffer.remove.calls.count()).toBe(1);
+      expect(audioSourceBuffer.remove.calls.argsFor(0)[0]).toBe(0);
+      expect(audioSourceBuffer.remove.calls.argsFor(0)[1] >= 20).toBeTruthy();
     });
 
-    it('does not seek', function(done) {
+    it('does not seek', async () => {
       // We had a bug in which we got into a seek loop. Seeking caused
       // StreamingEngine to call clear().  Clearing triggered a pipeline flush
       // which was implemented by seeking.  See issue #569.
@@ -789,26 +795,26 @@ describe('MediaSourceEngine', function() {
       mockVideo.currentTime = originalTime;
 
       mockMediaSource.durationGetter_.and.returnValue(20);
-      mediaSourceEngine.clear(ContentType.AUDIO).then(function() {
-        expect(mockVideo.currentTime).toBe(originalTime);
-        done();
-      });
+      const p = mediaSourceEngine.clear(ContentType.AUDIO);
       audioSourceBuffer.updateend();
+
+      await p;
+      expect(mockVideo.currentTime).toBe(originalTime);
     });
 
     it('will forward to TextEngine', async () => {
       expect(mockTextEngine.setTimestampOffset).not.toHaveBeenCalled();
       expect(mockTextEngine.setAppendWindow).not.toHaveBeenCalled();
       await mediaSourceEngine.setStreamProperties(ContentType.TEXT,
-                                                  /* timestampOffset */ 10,
-                                                  /* appendWindowStart */ 0,
-                                                  /* appendWindowEnd */ 20);
+          /* timestampOffset */ 10,
+          /* appendWindowStart */ 0,
+          /* appendWindowEnd */ 20);
       expect(mockTextEngine.setTimestampOffset).toHaveBeenCalledWith(10);
       expect(mockTextEngine.setAppendWindow).toHaveBeenCalledWith(0, 20);
     });
   });
 
-  describe('endOfStream', function() {
+  describe('endOfStream', () => {
     beforeEach(async () => {
       captureEvents(audioSourceBuffer, ['updateend', 'error']);
       captureEvents(videoSourceBuffer, ['updateend', 'error']);
@@ -825,15 +831,15 @@ describe('MediaSourceEngine', function() {
 
     it('waits for all previous operations to complete', async () => {
       /** @type {!shaka.test.StatusPromise} */
-      let p1 = new shaka.test.StatusPromise(mediaSourceEngine.appendBuffer(
+      const p1 = new shaka.test.StatusPromise(mediaSourceEngine.appendBuffer(
           ContentType.AUDIO, buffer, null, null,
           /* hasClosedCaptions */ false));
       /** @type {!shaka.test.StatusPromise} */
-      let p2 = new shaka.test.StatusPromise(mediaSourceEngine.appendBuffer(
+      const p2 = new shaka.test.StatusPromise(mediaSourceEngine.appendBuffer(
           ContentType.VIDEO, buffer, null, null,
           /* hasClosedCaptions */ false));
       /** @type {!shaka.test.StatusPromise} */
-      let p3 = new shaka.test.StatusPromise(mediaSourceEngine.endOfStream());
+      const p3 = new shaka.test.StatusPromise(mediaSourceEngine.endOfStream());
 
       expect(mockMediaSource.endOfStream).not.toHaveBeenCalled();
       expect(p1.status).toBe('pending');
@@ -852,7 +858,7 @@ describe('MediaSourceEngine', function() {
 
     it('makes subsequent operations wait', async () => {
       /** @type {!Promise} */
-      let p1 = mediaSourceEngine.endOfStream();
+      const p1 = mediaSourceEngine.endOfStream();
       mediaSourceEngine.appendBuffer(ContentType.AUDIO, buffer, null, null,
           /* hasClosedCaptions */ false);
       mediaSourceEngine.appendBuffer(ContentType.VIDEO, buffer, null, null,
@@ -884,25 +890,21 @@ describe('MediaSourceEngine', function() {
     it('runs subsequent operations if this operation throws', async () => {
       mockMediaSource.endOfStream.and.throwError(new Error());
       /** @type {!Promise} */
-      let p1 = mediaSourceEngine.endOfStream();
+      const p1 = mediaSourceEngine.endOfStream();
       mediaSourceEngine.appendBuffer(ContentType.AUDIO, buffer, null, null,
           /* hasClosedCaptions */ false);
 
       expect(audioSourceBuffer.appendBuffer).not.toHaveBeenCalled();
 
-      try {
-        await p1;
-        fail('not reached');
-      } catch (error) {
-        expect(mockMediaSource.endOfStream).toHaveBeenCalled();
-        await Util.delay(0.1);
-        expect(audioSourceBuffer.appendBuffer).toHaveBeenCalledWith(1);
-        audioSourceBuffer.updateend();
-      }
+      await expectAsync(p1).toBeRejected();
+      expect(mockMediaSource.endOfStream).toHaveBeenCalled();
+      await Util.delay(0.1);
+      expect(audioSourceBuffer.appendBuffer).toHaveBeenCalledWith(1);
+      audioSourceBuffer.updateend();
     });
   });
 
-  describe('setDuration', function() {
+  describe('setDuration', () => {
     beforeEach(async () => {
       mockMediaSource.durationGetter_.and.returnValue(0);
       captureEvents(audioSourceBuffer, ['updateend', 'error']);
@@ -920,15 +922,16 @@ describe('MediaSourceEngine', function() {
 
     it('waits for all previous operations to complete', async () => {
       /** @type {!shaka.test.StatusPromise} */
-      let p1 = new shaka.test.StatusPromise(mediaSourceEngine.appendBuffer(
+      const p1 = new shaka.test.StatusPromise(mediaSourceEngine.appendBuffer(
           ContentType.AUDIO, buffer, null, null,
           /* hasClosedCaptions */ false));
       /** @type {!shaka.test.StatusPromise} */
-      let p2 = new shaka.test.StatusPromise(mediaSourceEngine.appendBuffer(
+      const p2 = new shaka.test.StatusPromise(mediaSourceEngine.appendBuffer(
           ContentType.VIDEO, buffer, null, null,
           /* hasClosedCaptions */ false));
       /** @type {!shaka.test.StatusPromise} */
-      let p3 = new shaka.test.StatusPromise(mediaSourceEngine.setDuration(100));
+      const p3 =
+          new shaka.test.StatusPromise(mediaSourceEngine.setDuration(100));
 
       expect(mockMediaSource.durationSetter_).not.toHaveBeenCalled();
       expect(p1.status).toBe('pending');
@@ -947,7 +950,7 @@ describe('MediaSourceEngine', function() {
 
     it('makes subsequent operations wait', async () => {
       /** @type {!Promise} */
-      let p1 = mediaSourceEngine.setDuration(100);
+      const p1 = mediaSourceEngine.setDuration(100);
       mediaSourceEngine.appendBuffer(ContentType.AUDIO, buffer, null, null,
           /* hasClosedCaptions */ false);
       mediaSourceEngine.appendBuffer(ContentType.VIDEO, buffer, null, null,
@@ -980,25 +983,21 @@ describe('MediaSourceEngine', function() {
     it('runs subsequent operations if this operation throws', async () => {
       mockMediaSource.durationSetter_.and.throwError(new Error());
       /** @type {!Promise} */
-      let p1 = mediaSourceEngine.setDuration(100);
+      const p1 = mediaSourceEngine.setDuration(100);
       mediaSourceEngine.appendBuffer(ContentType.AUDIO, buffer, null, null,
           /* hasClosedCaptions */ false);
 
       expect(audioSourceBuffer.appendBuffer).not.toHaveBeenCalled();
 
-      try {
-        await p1;
-        fail('not reached');
-      } catch (error) {
-        expect(mockMediaSource.durationSetter_).toHaveBeenCalled();
-        await Util.delay(0.1);
-        expect(audioSourceBuffer.appendBuffer).toHaveBeenCalledWith(buffer);
-        audioSourceBuffer.updateend();
-      }
+      await expectAsync(p1).toBeRejected();
+      expect(mockMediaSource.durationSetter_).toHaveBeenCalled();
+      await Util.delay(0.1);
+      expect(audioSourceBuffer.appendBuffer).toHaveBeenCalledWith(buffer);
+      audioSourceBuffer.updateend();
     });
   });
 
-  describe('destroy', function() {
+  describe('destroy', () => {
     beforeEach(async () => {
       captureEvents(audioSourceBuffer, ['updateend', 'error']);
       captureEvents(videoSourceBuffer, ['updateend', 'error']);
@@ -1010,12 +1009,12 @@ describe('MediaSourceEngine', function() {
 
     it('waits for all operations to complete', async () => {
       mediaSourceEngine.appendBuffer(ContentType.AUDIO, buffer, null, null,
-        /* hasClosedCaptions */ false);
+          /* hasClosedCaptions */ false);
       mediaSourceEngine.appendBuffer(ContentType.VIDEO, buffer, null, null,
-        /* hasClosedCaptions */ false);
+          /* hasClosedCaptions */ false);
 
       /** @type {!shaka.test.StatusPromise} */
-      let p = new shaka.test.StatusPromise(mediaSourceEngine.destroy());
+      const p = new shaka.test.StatusPromise(mediaSourceEngine.destroy());
 
       expect(p.status).toBe('pending');
       await Util.delay(0.1);
@@ -1030,11 +1029,11 @@ describe('MediaSourceEngine', function() {
 
     it('resolves even when a pending operation fails', async () => {
       /** @type {!shaka.test.StatusPromise} */
-      let p1 = new shaka.test.StatusPromise(mediaSourceEngine.appendBuffer(
+      const p1 = new shaka.test.StatusPromise(mediaSourceEngine.appendBuffer(
           ContentType.AUDIO, buffer, null, null,
           /* hasClosedCaptions */ false));
       /** @type {!shaka.test.StatusPromise} */
-      let p2 = new shaka.test.StatusPromise(mediaSourceEngine.destroy());
+      const p2 = new shaka.test.StatusPromise(mediaSourceEngine.destroy());
 
       audioSourceBuffer.error();
       audioSourceBuffer.updateend();
@@ -1045,9 +1044,9 @@ describe('MediaSourceEngine', function() {
 
     it('waits for blocking operations to complete', async () => {
       /** @type {!shaka.test.StatusPromise} */
-      let p1 = new shaka.test.StatusPromise(mediaSourceEngine.endOfStream());
+      const p1 = new shaka.test.StatusPromise(mediaSourceEngine.endOfStream());
       /** @type {!shaka.test.StatusPromise} */
-      let p2 = new shaka.test.StatusPromise(mediaSourceEngine.destroy());
+      const p2 = new shaka.test.StatusPromise(mediaSourceEngine.destroy());
 
       expect(p1.status).toBe('pending');
       expect(p2.status).toBe('pending');
@@ -1059,9 +1058,9 @@ describe('MediaSourceEngine', function() {
 
     it('cancels operations that have not yet started', async () => {
       mediaSourceEngine.appendBuffer(
-        ContentType.AUDIO, buffer, null, null, /* hasClosedCaptions */ false);
+          ContentType.AUDIO, buffer, null, null, /* hasClosedCaptions */ false);
       /** @type {!shaka.test.StatusPromise} */
-      let rejected =
+      const rejected =
           new shaka.test.StatusPromise(mediaSourceEngine.appendBuffer(
               ContentType.AUDIO, buffer2, null, null,
               /* hasClosedCaptions */ false));
@@ -1070,7 +1069,7 @@ describe('MediaSourceEngine', function() {
       expect(audioSourceBuffer.appendBuffer).not.toHaveBeenCalledWith(buffer2);
 
       /** @type {!shaka.test.StatusPromise} */
-      let p = new shaka.test.StatusPromise(mediaSourceEngine.destroy());
+      const p = new shaka.test.StatusPromise(mediaSourceEngine.destroy());
 
       expect(p.status).toBe('pending');
       await Util.delay(0.1);
@@ -1086,13 +1085,13 @@ describe('MediaSourceEngine', function() {
 
     it('cancels blocking operations that have not yet started', async () => {
       /** @type {!shaka.test.StatusPromise} */
-      let p1 = new shaka.test.StatusPromise(mediaSourceEngine.appendBuffer(
+      const p1 = new shaka.test.StatusPromise(mediaSourceEngine.appendBuffer(
           ContentType.AUDIO, buffer, null, null,
           /* hasClosedCaptions */ false));
       /** @type {!shaka.test.StatusPromise} */
-      let p2 = new shaka.test.StatusPromise(mediaSourceEngine.endOfStream());
+      const p2 = new shaka.test.StatusPromise(mediaSourceEngine.endOfStream());
       /** @type {!shaka.test.StatusPromise} */
-      let p3 = new shaka.test.StatusPromise(mediaSourceEngine.destroy());
+      const p3 = new shaka.test.StatusPromise(mediaSourceEngine.destroy());
 
       expect(p1.status).toBe('pending');
       expect(p2.status).toBe('pending');
@@ -1106,19 +1105,12 @@ describe('MediaSourceEngine', function() {
     });
 
     it('prevents new operations from being added', async () => {
-      let p = mediaSourceEngine.destroy();
-      /** @type {!shaka.test.StatusPromise} */
-      let rejected =
-          new shaka.test.StatusPromise(mediaSourceEngine.appendBuffer(
+      const p = mediaSourceEngine.destroy();
+      await expectAsync(
+          mediaSourceEngine.appendBuffer(
               ContentType.AUDIO, buffer, null, null,
-              /* hasClosedCaptions */ false));
-
-      // The promise has already been rejected, but our capture requires 1 tick.
-      Promise.resolve().then(function() {
-        expect(rejected.status).toBe('rejected');
-        expect(audioSourceBuffer.appendBuffer).not.toHaveBeenCalled();
-      });
-
+              /* hasClosedCaptions */ false))
+          .toBeRejected();
       await p;
       expect(audioSourceBuffer.appendBuffer).not.toHaveBeenCalled();
     });
@@ -1139,14 +1131,14 @@ describe('MediaSourceEngine', function() {
   });
 
   function createMockMediaSource() {
-    let mediaSource = {
+    const mediaSource = {
       readyState: 'open',
       addSourceBuffer: jasmine.createSpy('addSourceBuffer'),
       endOfStream: jasmine.createSpy('endOfStream'),
       durationGetter_: jasmine.createSpy('duration getter'),
       durationSetter_: jasmine.createSpy('duration setter'),
       addEventListener: jasmine.createSpy('addEventListener'),
-      removeEventListener: function() {},
+      removeEventListener: () => {},
     };
     Object.defineProperty(
         mediaSource, 'duration',
@@ -1170,15 +1162,15 @@ describe('MediaSourceEngine', function() {
       },
       timestampOffset: 0,
       appendWindowEnd: Infinity,
-      updateend: function() {},
-      error: function() {},
+      updateend: () => {},
+      error: () => {},
     };
   }
 
   function createMockTextEngineCtor() {
-    let ctor = jasmine.createSpy('TextEngine');
-    ctor.isTypeSupported = function() { return true; };
-    ctor.and.callFake(function() {
+    const ctor = jasmine.createSpy('TextEngine');
+    ctor.isTypeSupported = () => true;
+    ctor.and.callFake(() => {
       expect(mockTextEngine).toBeFalsy();
       mockTextEngine = jasmine.createSpyObj('TextEngine', [
         'initParser', 'destroy', 'appendBuffer', 'remove', 'setTimestampOffset',
@@ -1186,7 +1178,7 @@ describe('MediaSourceEngine', function() {
         'appendCues', 'storeAndAppendClosedCaptions',
       ]);
 
-      let resolve = Promise.resolve.bind(Promise);
+      const resolve = () => Promise.resolve();
       mockTextEngine.destroy.and.callFake(resolve);
       mockTextEngine.appendBuffer.and.callFake(resolve);
       mockTextEngine.remove.and.callFake(resolve);
@@ -1196,12 +1188,12 @@ describe('MediaSourceEngine', function() {
   }
 
   function captureEvents(object, targetEventNames) {
-    object.addEventListener.and.callFake(function(eventName, listener) {
+    object.addEventListener.and.callFake((eventName, listener) => {
       if (targetEventNames.includes(eventName)) {
         object[eventName] = listener;
       }
     });
-    object.removeEventListener.and.callFake(function(eventName, listener) {
+    object.removeEventListener.and.callFake((eventName, listener) => {
       if (targetEventNames.includes(eventName)) {
         expect(object[eventName]).toBe(listener);
         object[eventName] = null;

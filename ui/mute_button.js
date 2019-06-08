@@ -22,6 +22,7 @@ goog.require('shaka.ui.Element');
 goog.require('shaka.ui.Enums');
 goog.require('shaka.ui.Locales');
 goog.require('shaka.ui.Localization');
+goog.require('shaka.util.Dom');
 
 
 /**
@@ -38,7 +39,7 @@ shaka.ui.MuteButton = class extends shaka.ui.Element {
     super(parent, controls);
 
     /** @private {!HTMLElement} */
-    this.button_ = shaka.ui.Utils.createHTMLElement('button');
+    this.button_ = shaka.util.Dom.createHTMLElement('button');
     this.button_.classList.add('shaka-mute-button');
     this.button_.classList.add('material-icons');
     this.button_.textContent = shaka.ui.Enums.MaterialDesignIcons.MUTE;
@@ -46,14 +47,14 @@ shaka.ui.MuteButton = class extends shaka.ui.Element {
     this.updateAriaLabel_();
 
     this.eventManager.listen(
-      this.localization, shaka.ui.Localization.LOCALE_UPDATED, () => {
-        this.updateAriaLabel_();
-      });
+        this.localization, shaka.ui.Localization.LOCALE_UPDATED, () => {
+          this.updateAriaLabel_();
+        });
 
     this.eventManager.listen(
-      this.localization, shaka.ui.Localization.LOCALE_CHANGED, () => {
-        this.updateAriaLabel_();
-      });
+        this.localization, shaka.ui.Localization.LOCALE_CHANGED, () => {
+          this.updateAriaLabel_();
+        });
 
     this.eventManager.listen(this.button_, 'click', () => {
       this.video.muted = !this.video.muted;
@@ -70,8 +71,7 @@ shaka.ui.MuteButton = class extends shaka.ui.Element {
    */
   updateAriaLabel_() {
     const LocIds = shaka.ui.Locales.Ids;
-    const label =
-      this.video.muted ? LocIds.ARIA_LABEL_UNMUTE : LocIds.ARIA_LABEL_MUTE;
+    const label = this.video.muted ? LocIds.UNMUTE : LocIds.MUTE;
 
     this.button_.setAttribute(shaka.ui.Constants.ARIA_LABEL,
         this.localization.resolve(label));

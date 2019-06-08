@@ -40,7 +40,7 @@ shaka.ui.VolumeBar = class extends shaka.ui.Element {
     // less/range_elements.less for a complete explanation.
     // TODO: Factor this into a range-element component.
     /** @private {!HTMLElement} */
-    this.container_ = shaka.ui.Utils.createHTMLElement('div');
+    this.container_ = shaka.util.Dom.createHTMLElement('div');
     this.container_.classList.add('shaka-volume-bar-container');
 
     this.bar_ =
@@ -66,14 +66,14 @@ shaka.ui.VolumeBar = class extends shaka.ui.Element {
     });
 
     this.eventManager.listen(
-      this.localization, shaka.ui.Localization.LOCALE_UPDATED, () => {
-        this.updateAriaLabel_();
-      });
+        this.localization, shaka.ui.Localization.LOCALE_UPDATED, () => {
+          this.updateAriaLabel_();
+        });
 
     this.eventManager.listen(
-      this.localization, shaka.ui.Localization.LOCALE_CHANGED, () => {
-        this.updateAriaLabel_();
-      });
+        this.localization, shaka.ui.Localization.LOCALE_CHANGED, () => {
+          this.updateAriaLabel_();
+        });
 
     // Initialize volume display with a fake event.
     this.onVolumeStateChange_();
@@ -85,13 +85,13 @@ shaka.ui.VolumeBar = class extends shaka.ui.Element {
    */
   onVolumeStateChange_() {
     if (this.video.muted) {
-        this.bar_.value = 0;
+      this.bar_.value = 0;
     } else {
-        this.bar_.value = this.video.volume;
+      this.bar_.value = this.video.volume;
     }
 
     // TODO: Can we do this with LESS?
-    let gradient = ['to right'];
+    const gradient = ['to right'];
     gradient.push(shaka.ui.Constants.VOLUME_BAR_VOLUME_LEVEL_COLOR +
                  (this.bar_.value * 100) + '%');
     gradient.push(shaka.ui.Constants.VOLUME_BAR_BASE_COLOR +
@@ -120,7 +120,7 @@ shaka.ui.VolumeBar = class extends shaka.ui.Element {
    */
   updateAriaLabel_() {
     this.bar_.setAttribute(shaka.ui.Constants.ARIA_LABEL,
-        this.localization.resolve(shaka.ui.Locales.Ids.ARIA_LABEL_VOLUME));
+        this.localization.resolve(shaka.ui.Locales.Ids.VOLUME));
   }
 };
 

@@ -18,66 +18,293 @@
 goog.provide('shaka.test.TestScheme');
 
 
-/**
- * A plugin that handles fake network requests.  This will serve both segments
- * and manifests that will point to a fake manifest generator.
- *
- * @param {string} uri
- * @param {shaka.extern.Request} request
- * @param {shaka.net.NetworkingEngine.RequestType=} requestType
- * @return {!shaka.extern.IAbortableOperation.<shaka.extern.Response>}
- */
-shaka.test.TestScheme = function(uri, request, requestType) {
-  let manifestParts = /^test:([^/]+)$/.exec(uri);
-  if (manifestParts) {
+shaka.test.TestScheme = class {
+  /**
+   * A plugin that handles fake network requests.  This will serve both segments
+   * and manifests that will point to a fake manifest generator.
+   *
+   * The test scheme URIs look like one of the following:
+   * - test:name
+   * - test:name/video/123
+   *
+   * @param {string} uri
+   * @param {shaka.extern.Request} request
+   * @param {shaka.net.NetworkingEngine.RequestType=} requestType
+   * @return {!shaka.extern.IAbortableOperation.<shaka.extern.Response>}
+   */
+  static plugin(uri, request, requestType) {
+    const manifestParts = /^test:([^/]+)$/.exec(uri);
+    if (manifestParts) {
+      /** @type {shaka.extern.Response} */
+      const response = {
+        uri: uri,
+        originalUri: uri,
+        data: new ArrayBuffer(0),
+        headers: {'content-type': 'application/x-test-manifest'},
+      };
+      return shaka.util.AbortableOperation.completed(response);
+    }
+
+    const malformed = new shaka.util.Error(
+        shaka.util.Error.Severity.CRITICAL,
+        shaka.util.Error.Category.NETWORK,
+        shaka.util.Error.Code.MALFORMED_TEST_URI);
+
+    const re = /^test:([^/]+)\/(video|audio)\/(init|[0-9]+)$/;
+    const segmentParts = re.exec(uri);
+    if (!segmentParts) {
+      // Use expect so the URI is printed on errors.
+      expect(uri).toMatch(re);
+      return shaka.util.AbortableOperation.failed(malformed);
+    }
+
+    const name = segmentParts[1];
+    const type = segmentParts[2];
+
+    const generators = shaka.test.TestScheme.GENERATORS[name];
+    expect(generators).toBeTruthy();
+    if (!generators) {
+      return shaka.util.AbortableOperation.failed(malformed);
+    }
+
+    const generator = generators[type];
+    expect(generator).toBeTruthy();
+    if (!generator) {
+      return shaka.util.AbortableOperation.failed(malformed);
+    }
+
+    let responseData;
+    if (segmentParts[3] === 'init') {
+      responseData = generator.getInitSegment(0);
+    } else {
+      const index = Number(segmentParts[3]);
+      responseData = generator.getSegment(index + 1, 0, 0);
+    }
+
     /** @type {shaka.extern.Response} */
-    let response = {
-      uri: uri,
-      data: new ArrayBuffer(0),
-      headers: {'content-type': 'application/x-test-manifest'},
-    };
-    return shaka.util.AbortableOperation.completed(response);
+    const ret = {uri: uri, originalUri: uri, data: responseData, headers: {}};
+    return shaka.util.AbortableOperation.completed(ret);
   }
 
-  let malformed = new shaka.util.Error(
-      shaka.util.Error.Severity.CRITICAL,
-      shaka.util.Error.Category.NETWORK,
-      shaka.util.Error.Code.MALFORMED_TEST_URI);
+  /**
+   * Sets up the networking callbacks required to play the given asset.
+   *
+   * @param {!shaka.Player} player
+   * @param {string} name
+   */
+  static setupPlayer(player, name) {
+    const asset = shaka.test.TestScheme.DATA[name];
+    goog.asserts.assert(asset, 'Unknown asset');
+    if (!asset) {
+      return;
+    }
+    if (asset.licenseRequestHeaders) {
+      const netEngine = player.getNetworkingEngine();
+      netEngine.registerRequestFilter((type, request) => {
+        if (type != shaka.net.NetworkingEngine.RequestType.LICENSE) {
+          return;
+        }
 
-  let re = /^test:([^/]+)\/(video|audio)\/(init|[0-9]+)$/;
-  let segmentParts = re.exec(uri);
-  if (!segmentParts) {
-    // Use expect so the URI is printed on errors.
-    expect(uri).toMatch(re);
-    return shaka.util.AbortableOperation.failed(malformed);
+        for (const header in asset.licenseRequestHeaders) {
+          request.headers[header] = asset.licenseRequestHeaders[header];
+        }
+      });
+    }
+    if (asset.licenseServers) {
+      const config = {drm: {servers: asset.licenseServers}};
+      player.configure(config);
+    }
   }
 
-  let name = segmentParts[1];
-  let type = segmentParts[2];
+  /**
+   * Creates the manifests and generators.
+   * @param {*} shaka
+   * @param {string} suffix
+   * @return {!Promise}
+   */
+  static createManifests(shaka, suffix) {
+    /** @type {?} */
+    const windowShaka = window['shaka'];
 
-  let generators = shaka.test.TestScheme.GENERATORS[name];
-  expect(generators).toBeTruthy();
-  if (!generators) {
-    return shaka.util.AbortableOperation.failed(malformed);
+    /**
+     * @param {Object} metadata
+     * @return {shaka.test.IStreamGenerator}
+     */
+    function createStreamGenerator(metadata) {
+      if (metadata.segmentUri.includes('.ts')) {
+        return new windowShaka.test.TSVodStreamGenerator(
+            metadata.segmentUri);
+      }
+      return new windowShaka.test.Mp4VodStreamGenerator(
+          metadata.initSegmentUri, metadata.mdhdOffset, metadata.segmentUri,
+          metadata.tfdtOffset, metadata.segmentDuration,
+          metadata.presentationTimeOffset);
+    }
+
+    /**
+     * Not for simulating non-segmented text streams.
+     *
+     * @param {shaka.test.ManifestGenerator} manifestGenerator
+     * @param {Object} data
+     * @param {shaka.util.ManifestParserUtils.ContentType} contentType
+     * @param {string} name
+     */
+    function addStreamInfo(manifestGenerator, data, contentType, name) {
+      manifestGenerator
+          .presentationTimeOffset(data[contentType].presentationTimeOffset)
+          .mime(data[contentType].mimeType, data[contentType].codecs)
+          .initSegmentReference(
+              ['test:' + name + '/' + contentType + '/init'], 0, null)
+          .useSegmentTemplate('test:' + name + '/' + contentType + '/%d',
+              data[contentType].segmentDuration)
+          .closedCaptions(data[contentType].closedCaptions);
+
+      if (data[contentType].language) {
+        manifestGenerator.language(data[contentType].language);
+      }
+
+      if (data[contentType].delaySetup) {
+        manifestGenerator.delayCreateSegmentIndex();
+      }
+
+      if (data.licenseServers) {
+        for (const keySystem in data.licenseServers) {
+          manifestGenerator.addDrmInfo(keySystem)
+              .licenseServerUri(data.licenseServers[keySystem]);
+          if (data[contentType].initData) {
+            manifestGenerator.addCencInitData(data[contentType].initData);
+          }
+        }
+      }
+    }
+
+    /**
+     * @param {!Object} data
+     * @return {string}
+     */
+    function getAbsoluteUri(data) {
+      // This seems to be necessary.  Otherwise, we end up with an URL like
+      // "http:/base/..." which then fails to load on Safari for some reason.
+      const locationUri = new goog.Uri(location.href);
+      const partialUri = new goog.Uri(data.text.uri);
+      return locationUri.resolve(partialUri).toString();
+    }
+
+    const async = [];
+    // Include 'window' to use uncompiled version version of the library.
+    const DATA = windowShaka.test.TestScheme.DATA;
+    const GENERATORS = windowShaka.test.TestScheme.GENERATORS;
+    const MANIFESTS = windowShaka.test.TestScheme.MANIFESTS;
+    const ContentType = windowShaka.util.ManifestParserUtils.ContentType;
+
+    for (const name in DATA) {
+      GENERATORS[name + suffix] = GENERATORS[name + suffix] || {};
+      const data = DATA[name];
+      for (const type of [ContentType.VIDEO, ContentType.AUDIO]) {
+        if (data[type]) {
+          const streamGen = createStreamGenerator(data[type]);
+          GENERATORS[name + suffix][type] = streamGen;
+          async.push(streamGen.init());
+        }
+      }
+
+      const gen = new windowShaka.test.ManifestGenerator(shaka)
+          .setPresentationDuration(data.duration)
+          .addPeriod(/* startTime= */ 0)
+          .addVariant(0);
+
+      if (data[ContentType.VIDEO]) {
+        gen.addVideo(1);
+        addStreamInfo(gen, data, ContentType.VIDEO, name);
+      }
+      if (data[ContentType.AUDIO]) {
+        gen.addAudio(2);
+        addStreamInfo(gen, data, ContentType.AUDIO, name);
+      }
+
+      if (data.text) {
+        gen.addTextStream(3)
+            .mime(data.text.mimeType, data.text.codecs)
+            .textStream(getAbsoluteUri(data));
+
+        if (data.text.language) {
+          gen.language(data.text.language);
+        }
+      }
+
+      MANIFESTS[name + suffix] = gen.build();
+    }
+
+    // Custom generators:
+
+    const data = DATA['sintel'];
+    const periodDuration = 10;
+
+    // Multi-period
+    const numPeriods = 10;
+    let gen = new windowShaka.test.ManifestGenerator(shaka)
+        .setPresentationDuration(periodDuration * numPeriods);
+
+    let idCount = 1;
+    for (let i = 0; i < numPeriods; i++) {
+      gen.addPeriod(/* startTime= */ periodDuration * i);
+
+      gen.addVariant(idCount++).language('en');
+      gen.addVideo(idCount++);
+      addStreamInfo(gen, data, ContentType.VIDEO, 'sintel');
+      gen.addAudio(idCount++);
+      addStreamInfo(gen, data, ContentType.AUDIO, 'sintel');
+
+      gen.addVariant(idCount++).language('es');
+      gen.addVideo(idCount++);
+      addStreamInfo(gen, data, ContentType.VIDEO, 'sintel');
+      gen.addAudio(idCount++);
+      addStreamInfo(gen, data, ContentType.AUDIO, 'sintel');
+    }
+
+    MANIFESTS['sintel_short_periods' + suffix] = gen.build();
+
+    // Multi-stream. Different languages and resolutions.
+    idCount = 1;
+    gen = new windowShaka.test.ManifestGenerator(shaka)
+        .setPresentationDuration(periodDuration);
+    gen.addPeriod(/* startTime= */ 0);
+
+    // Variant in English, res 426x182
+    gen.addVariant(idCount++).language('en');
+    gen.addVideo(idCount++).size(426, 182);
+    addStreamInfo(gen, data, ContentType.VIDEO, 'sintel');
+    gen.addAudio(idCount++).language('en');
+    addStreamInfo(gen, data, ContentType.AUDIO, 'sintel');
+
+    // Same language, different resolution
+    gen.addVariant(idCount++).language('en');
+    gen.addVideo(idCount++).size(640, 272);
+    addStreamInfo(gen, data, ContentType.VIDEO, 'sintel');
+    gen.addAudio(idCount++).language('en');
+    addStreamInfo(gen, data, ContentType.AUDIO, 'sintel');
+
+    // Same resolution, different language
+    gen.addVariant(idCount++).language('es');
+    gen.addVideo(idCount++).size(640, 272);
+    addStreamInfo(gen, data, ContentType.VIDEO, 'sintel');
+    gen.addAudio(idCount++).language('es');
+    addStreamInfo(gen, data, ContentType.AUDIO, 'sintel');
+
+    gen.addTextStream(idCount++)
+        .mime(data.text.mimeType, data.text.codecs)
+        .textStream(getAbsoluteUri(data))
+        .language('zh');
+
+    gen.addTextStream(idCount++)
+        .mime(data.text.mimeType, data.text.codecs)
+        .textStream(getAbsoluteUri(data))
+        .language('fr');
+
+    MANIFESTS['sintel_multi_lingual_multi_res' + suffix] = gen.build();
+
+    return Promise.all(async);
   }
-
-  let generator = generators[type];
-  expect(generator).toBeTruthy();
-  if (!generator) {
-    return shaka.util.AbortableOperation.failed(malformed);
-  }
-
-  let responseData;
-  if (segmentParts[3] === 'init') {
-    responseData = generator.getInitSegment(0);
-  } else {
-    let index = Number(segmentParts[3]);
-    responseData = generator.getSegment(index + 1, 0, 0);
-  }
-
-  /** @type {shaka.extern.Response} */
-  let ret = {uri: uri, data: responseData, headers: {}};
-  return shaka.util.AbortableOperation.completed(ret);
 };
 
 
@@ -89,12 +316,18 @@ shaka.test.TestScheme.MANIFESTS = {};
 shaka.test.TestScheme.GENERATORS = {};
 
 
+// TODO: The values in mdhdOffset and tfdtOffset are specific to the segments
+// in each test scheme.  These are byte offsets into these segments where
+// certain boxes can be found and easily manipulated.  This predates our more
+// general MP4 box parser.  We could eliminate these hard-coded offsets and use
+// our box parser to find the boxes at runtime after we load the segments.
+
 /** @const */
 shaka.test.TestScheme.DATA = {
   'sintel': {
     video: {
       initSegmentUri: '/base/test/test/assets/sintel-video-init.mp4',
-      mvhdOffset: 0x24,
+      mdhdOffset: 0x1ba,
       segmentUri: '/base/test/test/assets/sintel-video-segment.mp4',
       tfdtOffset: 0x38,
       segmentDuration: 10,
@@ -104,7 +337,7 @@ shaka.test.TestScheme.DATA = {
     },
     audio: {
       initSegmentUri: '/base/test/test/assets/sintel-audio-init.mp4',
-      mvhdOffset: 0x20,
+      mdhdOffset: 0x1b6,
       segmentUri: '/base/test/test/assets/sintel-audio-segment.mp4',
       tfdtOffset: 0x3c,
       segmentDuration: 10.005,
@@ -124,7 +357,7 @@ shaka.test.TestScheme.DATA = {
   'sintel_realistic': {
     video: {
       initSegmentUri: '/base/test/test/assets/sintel-video-init.mp4',
-      mvhdOffset: 0x24,
+      mdhdOffset: 0x1ba,
       segmentUri: '/base/test/test/assets/sintel-video-segment.mp4',
       tfdtOffset: 0x38,
       segmentDuration: 10,
@@ -135,7 +368,7 @@ shaka.test.TestScheme.DATA = {
     },
     audio: {
       initSegmentUri: '/base/test/test/assets/sintel-audio-init.mp4',
-      mvhdOffset: 0x20,
+      mdhdOffset: 0x1b6,
       segmentUri: '/base/test/test/assets/sintel-audio-segment.mp4',
       tfdtOffset: 0x3c,
       segmentDuration: 10.005,
@@ -156,10 +389,24 @@ shaka.test.TestScheme.DATA = {
   // 'sintel_short_periods' : Generated by createManifests().
   // 'sintel_multi_lingual_multi_res' : Generated by createManifests().
 
+  'sintel_audio_only': {
+    audio: {
+      initSegmentUri: '/base/test/test/assets/sintel-audio-init.mp4',
+      mdhdOffset: 0x1b6,
+      segmentUri: '/base/test/test/assets/sintel-audio-segment.mp4',
+      tfdtOffset: 0x3c,
+      segmentDuration: 10.005,
+      presentationTimeOffset: 0,
+      mimeType: 'audio/mp4',
+      codecs: 'mp4a.40.2',
+    },
+    duration: 30,
+  },
+
   'sintel_no_text': {
     video: {
       initSegmentUri: '/base/test/test/assets/sintel-video-init.mp4',
-      mvhdOffset: 0x24,
+      mdhdOffset: 0x1ba,
       segmentUri: '/base/test/test/assets/sintel-video-segment.mp4',
       tfdtOffset: 0x38,
       segmentDuration: 10,
@@ -169,7 +416,7 @@ shaka.test.TestScheme.DATA = {
     },
     audio: {
       initSegmentUri: '/base/test/test/assets/sintel-audio-init.mp4',
-      mvhdOffset: 0x20,
+      mdhdOffset: 0x1b6,
       segmentUri: '/base/test/test/assets/sintel-audio-segment.mp4',
       tfdtOffset: 0x3c,
       segmentDuration: 10.005,
@@ -183,7 +430,7 @@ shaka.test.TestScheme.DATA = {
   'sintel-enc': {
     video: {
       initSegmentUri: '/base/test/test/assets/encrypted-sintel-video-init.mp4',
-      mvhdOffset: 0x24,
+      mdhdOffset: 0x1ba,
       segmentUri: '/base/test/test/assets/encrypted-sintel-video-segment.mp4',
       tfdtOffset: 0x38,
       segmentDuration: 10,
@@ -197,7 +444,7 @@ shaka.test.TestScheme.DATA = {
     },
     audio: {
       initSegmentUri: '/base/test/test/assets/encrypted-sintel-audio-init.mp4',
-      mvhdOffset: 0x20,
+      mdhdOffset: 0x1b6,
       segmentUri: '/base/test/test/assets/encrypted-sintel-audio-segment.mp4',
       tfdtOffset: 0x3c,
       segmentDuration: 10.005,
@@ -222,7 +469,7 @@ shaka.test.TestScheme.DATA = {
   'multidrm': {
     video: {
       initSegmentUri: '/base/test/test/assets/multidrm-video-init.mp4',
-      mvhdOffset: 0x72,
+      mdhdOffset: 0x1d1,
       segmentUri: '/base/test/test/assets/multidrm-video-segment.mp4',
       tfdtOffset: 0x78,
       segmentDuration: 4,
@@ -235,7 +482,7 @@ shaka.test.TestScheme.DATA = {
     },
     audio: {
       initSegmentUri: '/base/test/test/assets/multidrm-audio-init.mp4',
-      mvhdOffset: 0x72,
+      mdhdOffset: 0x192,
       segmentUri: '/base/test/test/assets/multidrm-audio-segment.mp4',
       tfdtOffset: 0x7c,
       segmentDuration: 4,
@@ -270,7 +517,7 @@ shaka.test.TestScheme.DATA = {
   'multidrm_no_init_data': {
     video: {
       initSegmentUri: '/base/test/test/assets/multidrm-video-init.mp4',
-      mvhdOffset: 0x72,
+      mdhdOffset: 0x1d1,
       segmentUri: '/base/test/test/assets/multidrm-video-segment.mp4',
       tfdtOffset: 0x78,
       segmentDuration: 4,
@@ -280,7 +527,7 @@ shaka.test.TestScheme.DATA = {
     },
     audio: {
       initSegmentUri: '/base/test/test/assets/multidrm-audio-init.mp4',
-      mvhdOffset: 0x72,
+      mdhdOffset: 0x192,
       segmentUri: '/base/test/test/assets/multidrm-audio-segment.mp4',
       tfdtOffset: 0x7c,
       segmentDuration: 4,
@@ -320,7 +567,7 @@ shaka.test.TestScheme.DATA = {
   'cea-708_mp4': {
     video: {
       initSegmentUri: '/base/test/test/assets/cea-init.mp4',
-      mvhdOffset: 0x28,
+      mdhdOffset: 0x100,
       segmentUri: '/base/test/test/assets/cea-segment.mp4',
       tfdtOffset: 0x48,
       segmentDuration: 2,
@@ -334,279 +581,59 @@ shaka.test.TestScheme.DATA = {
 };
 
 
-/**
- * Sets up the networking callbacks required to play the given asset.
- *
- * @param {!shaka.Player} player
- * @param {string} name
- */
-shaka.test.TestScheme.setupPlayer = function(player, name) {
-  let asset = shaka.test.TestScheme.DATA[name];
-  goog.asserts.assert(asset, 'Unknown asset');
-  if (!asset) return;
-  if (asset.licenseRequestHeaders) {
-    let netEngine = player.getNetworkingEngine();
-    netEngine.registerRequestFilter(
-        function(type, request) {
-          if (type != shaka.net.NetworkingEngine.RequestType.LICENSE) return;
-
-          for (let header in asset.licenseRequestHeaders) {
-            request.headers[header] = asset.licenseRequestHeaders[header];
-          }
-        });
-  }
-  if (asset.licenseServers) {
-    let config = {drm: {servers: asset.licenseServers}};
-    player.configure(config);
-  }
-};
-
-
-/**
- * Creates the manifests and generators.
- * @param {*} shaka
- * @param {string} suffix
- * @return {!Promise}
- */
-shaka.test.TestScheme.createManifests = function(shaka, suffix) {
-  /** @type {?} */
-  let windowShaka = window['shaka'];
-
-  /**
-   * @param {Object} metadata
-   * @return {shaka.test.IStreamGenerator}
-   */
-  function createStreamGenerator(metadata) {
-    if (metadata.segmentUri.includes('.ts')) {
-      return new windowShaka.test.TSVodStreamGenerator(
-          metadata.segmentUri);
-    }
-    return new windowShaka.test.Mp4VodStreamGenerator(
-        metadata.initSegmentUri, metadata.mvhdOffset, metadata.segmentUri,
-        metadata.tfdtOffset, metadata.segmentDuration,
-        metadata.presentationTimeOffset);
-  }
-
-  /**
-   * Not for simulating non-segmented text streams.
-   *
-   * @param {shaka.test.ManifestGenerator} manifestGenerator
-   * @param {Object} data
-   * @param {shaka.util.ManifestParserUtils.ContentType} contentType
-   * @param {string} name
-   */
-  function addStreamInfo(manifestGenerator, data, contentType, name) {
-    manifestGenerator
-      .presentationTimeOffset(data[contentType].presentationTimeOffset)
-      .mime(data[contentType].mimeType, data[contentType].codecs)
-      .initSegmentReference(
-            ['test:' + name + '/' + contentType + '/init'], 0, null)
-      .useSegmentTemplate('test:' + name + '/' + contentType + '/%d',
-                          data[contentType].segmentDuration)
-      .closedCaptions(data[contentType].closedCaptions);
-
-    if (data[contentType].language) {
-      manifestGenerator.language(data[contentType].language);
-    }
-
-    if (data[contentType].delaySetup) {
-      manifestGenerator.delayCreateSegmentIndex();
-    }
-
-    if (data.licenseServers) {
-      for (let keySystem in data.licenseServers) {
-        manifestGenerator.addDrmInfo(keySystem)
-            .licenseServerUri(data.licenseServers[keySystem]);
-        if (data[contentType].initData) {
-          manifestGenerator.addCencInitData(data[contentType].initData);
-        }
-      }
-    }
-  }
-
-  /**
-   * @param {!Object} data
-   * @return {string}
-   */
-  function getAbsoluteUri(data) {
-    // This seems to be necessary.  Otherwise, we end up with an URL like
-    // "http:/base/..." which then fails to load on Safari for some reason.
-    const locationUri = new goog.Uri(location.href);
-    const partialUri = new goog.Uri(data.text.uri);
-    return locationUri.resolve(partialUri).toString();
-  }
-
-  let async = [];
-  // Include 'window' to use uncompiled version version of the library.
-  const DATA = windowShaka.test.TestScheme.DATA;
-  const GENERATORS = windowShaka.test.TestScheme.GENERATORS;
-  const MANIFESTS = windowShaka.test.TestScheme.MANIFESTS;
-  const ContentType = windowShaka.util.ManifestParserUtils.ContentType;
-
-  for (let name in DATA) {
-    GENERATORS[name + suffix] = GENERATORS[name + suffix] || {};
-    let data = DATA[name];
-    [ContentType.VIDEO, ContentType.AUDIO].forEach(function(type) {
-      if (data[type]) {
-        let streamGen = createStreamGenerator(data[type]);
-        GENERATORS[name + suffix][type] = streamGen;
-        async.push(streamGen.init());
-      }
-    });
-
-    let gen = new windowShaka.test.ManifestGenerator(shaka)
-        .setPresentationDuration(data.duration)
-        .addPeriod(0)
-        .addVariant(0)
-          .addVideo(1);
-    addStreamInfo(gen, data, ContentType.VIDEO, name);
-    if (data[ContentType.AUDIO]) {
-      gen.addAudio(2);
-      addStreamInfo(gen, data, ContentType.AUDIO, name);
-    }
-
-    if (data.text) {
-      gen.addTextStream(3)
-            .mime(data.text.mimeType, data.text.codecs)
-            .textStream(getAbsoluteUri(data));
-
-      if (data.text.language) {
-        gen.language(data.text.language);
-      }
-    }
-
-    MANIFESTS[name + suffix] = gen.build();
-  }
-
-  // Custom generators:
-
-  const data = DATA['sintel'];
-  const periodDuration = 10;
-
-  // Multi-period
-  const numPeriods = 10;
-  let gen = new windowShaka.test.ManifestGenerator(shaka)
-      .setPresentationDuration(periodDuration * numPeriods);
-
-  for (let i = 0; i < numPeriods; i++) {
-    gen.addPeriod(periodDuration * i);
-
-    gen.addVariant(2 * i).language('en');
-    gen.addVideo(4 * i);
-    addStreamInfo(gen, data, ContentType.VIDEO, 'sintel');
-    gen.addAudio(4 * i + 1);
-    addStreamInfo(gen, data, ContentType.AUDIO, 'sintel');
-
-    gen.addVariant(2 * i + 1).language('es');
-    gen.addVideo(4 * i + 2);
-    addStreamInfo(gen, data, ContentType.VIDEO, 'sintel');
-    gen.addAudio(4 * i + 3);
-    addStreamInfo(gen, data, ContentType.AUDIO, 'sintel');
-  }
-
-  MANIFESTS['sintel_short_periods' + suffix] = gen.build();
-
-  // Multi-stream. Different languages and resolutions.
-  let idCount = 1;
-  gen = new windowShaka.test.ManifestGenerator(shaka)
-      .setPresentationDuration(periodDuration);
-  gen.addPeriod(periodDuration);
-  gen.addVariant(idCount++).language('en');
-  gen.addVideo(idCount++).size(426, 182);
-  addStreamInfo(gen, data, ContentType.VIDEO, 'sintel');
-  gen.addAudio(idCount++).language('en');
-  addStreamInfo(gen, data, ContentType.AUDIO, 'sintel');
-
-  // Same language, different resolution
-  gen.addVariant(idCount++).language('en');
-  gen.addVideo(idCount++).size(640, 272);
-  addStreamInfo(gen, data, ContentType.VIDEO, 'sintel');
-  gen.addAudio(idCount++).language('en');
-  addStreamInfo(gen, data, ContentType.AUDIO, 'sintel');
-
-  // Same resolution, different language
-  gen.addVariant(idCount++).language('en');
-  gen.addVideo(idCount++).size(640, 272);
-  addStreamInfo(gen, data, ContentType.VIDEO, 'sintel');
-  gen.addAudio(idCount++).language('es');
-  addStreamInfo(gen, data, ContentType.AUDIO, 'sintel');
-
-  gen.addTextStream(idCount++)
-     .mime(data.text.mimeType, data.text.codecs)
-     .textStream(getAbsoluteUri(data))
-     .language('zh');
-
-  gen.addTextStream(idCount++)
-     .mime(data.text.mimeType, data.text.codecs)
-     .textStream(getAbsoluteUri(data))
-     .language('fr');
-
-  MANIFESTS['sintel_multi_lingual_multi_res' + suffix] = gen.build();
-
-  return Promise.all(async);
-};
-
-
-beforeAll(function(done) {
-  shaka.test.TestScheme.createManifests(shaka, '').catch(fail).then(done);
+beforeAll(async () => {
+  await shaka.test.TestScheme.createManifests(shaka, '');
 });
 
 
 /**
- * @constructor
- * @struct
  * @implements {shaka.extern.ManifestParser}
  */
-shaka.test.TestScheme.ManifestParser = function() {};
+shaka.test.TestScheme.ManifestParser = class {
+  /** @override */
+  configure(config) {}
 
+  /** @override */
+  start(uri, playerInterface) {
+    const re = /^test:([^/]+)$/;
+    const manifestParts = re.exec(uri);
+    if (!manifestParts) {
+      // Use expect so the URI is printed on errors.
+      expect(uri).toMatch(re);
+      return Promise.reject();
+    }
 
-/** @override */
-shaka.test.TestScheme.ManifestParser.prototype.configure = function(config) {};
+    const manifest = shaka.test.TestScheme.MANIFESTS[manifestParts[1]];
+    expect(manifest).toBeTruthy();
+    if (!manifest) {
+      return Promise.reject();
+    }
 
+    // Invoke filtering interfaces similar to how a real parser would.
+    // This makes sure the filtering functions are covered implicitly by
+    // tests. This covers regression
+    // https://github.com/google/shaka-player/issues/988
+    playerInterface.filterAllPeriods(manifest.periods);
+    for (const period of manifest.periods) {
+      playerInterface.filterNewPeriod(period);
+    }
 
-/** @override */
-shaka.test.TestScheme.ManifestParser.prototype.start =
-    function(uri, playerInterface) {
-  let re = /^test:([^/]+)$/;
-  let manifestParts = re.exec(uri);
-  if (!manifestParts) {
-    // Use expect so the URI is printed on errors.
-    expect(uri).toMatch(re);
-    return Promise.reject();
+    return Promise.resolve(manifest);
   }
 
-  let manifest = shaka.test.TestScheme.MANIFESTS[manifestParts[1]];
-  expect(manifest).toBeTruthy();
-  if (!manifest) return Promise.reject();
+  /** @override */
+  stop() {
+    return Promise.resolve();
+  }
 
-  // Invoke filtering interfaces similar to how a real parser would.
-  // This makes sure the filtering functions are covered implicitly by tests.
-  // This covers regression https://github.com/google/shaka-player/issues/988
-  playerInterface.filterAllPeriods(manifest.periods);
-  manifest.periods.forEach(function(period) {
-    playerInterface.filterNewPeriod(period);
-  });
+  /** @override */
+  update() {}
 
-  return Promise.resolve(manifest);
+  /** @override */
+  onExpirationUpdated() {}
 };
 
 
-/** @override */
-shaka.test.TestScheme.ManifestParser.prototype.stop = function() {
-  return Promise.resolve();
-};
-
-
-/** @override */
-shaka.test.TestScheme.ManifestParser.prototype.update = function() {};
-
-
-/** @override */
-shaka.test.TestScheme.ManifestParser.prototype.onExpirationUpdated =
-    function() {};
-
-
-shaka.net.NetworkingEngine.registerScheme('test', shaka.test.TestScheme);
+shaka.net.NetworkingEngine.registerScheme('test', shaka.test.TestScheme.plugin);
 shaka.media.ManifestParser.registerParserByMime(
     'application/x-test-manifest', shaka.test.TestScheme.ManifestParser);
-

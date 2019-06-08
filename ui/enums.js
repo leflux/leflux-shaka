@@ -16,10 +16,10 @@
  */
 
 
- goog.provide('shaka.ui.Enums');
+goog.provide('shaka.ui.Enums');
 
 
- /**
+/**
  * These strings are used to insert material design icons
  * and should never be localized.
  * @enum {string}
@@ -44,6 +44,8 @@ shaka.ui.Enums.MaterialDesignIcons = {
   'OPEN_OVERFLOW': 'more_vert',
   'REWIND': 'fast_rewind',
   'FAST_FORWARD': 'fast_forward',
+  'PLAY': 'play_arrow',
+  'PAUSE': 'pause',
 };
 
 

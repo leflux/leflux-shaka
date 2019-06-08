@@ -15,141 +15,132 @@
  * limitations under the License.
  */
 
-describe('LanguageUtils', function() {
-  describe('areLocaleCompatible', function() {
-    const areLocaleCompatible = shaka.util.LanguageUtils.areLocaleCompatible;
+describe('LanguageUtils', () => {
+  const LanguageUtils = shaka.util.LanguageUtils;
 
-    it('works for language', function() {
-      expect(areLocaleCompatible('en', 'en')).toBeTruthy();
-      expect(areLocaleCompatible('en', 'fr')).toBeFalsy();
+  describe('areLocaleCompatible', () => {
+    it('works for language', () => {
+      expect(LanguageUtils.areLocaleCompatible('en', 'en')).toBeTruthy();
+      expect(LanguageUtils.areLocaleCompatible('en', 'fr')).toBeFalsy();
     });
 
-    it('works for language and region', function() {
-      expect(areLocaleCompatible('en-US', 'en-US')).toBeTruthy();
-      expect(areLocaleCompatible('en-US', 'en-CA')).toBeFalsy();
+    it('works for language and region', () => {
+      expect(LanguageUtils.areLocaleCompatible('en-US', 'en-US')).toBeTruthy();
+      expect(LanguageUtils.areLocaleCompatible('en-US', 'en-CA')).toBeFalsy();
     });
 
-    it('ignores dialect', function() {
-      expect(areLocaleCompatible('en-US-tx', 'en-US-wa')).toBeTruthy();
-    });
-  });
-
-
-  describe('areLanguageCompatible', function() {
-    const LanguageUtils = shaka.util.LanguageUtils;
-    const areLanguageCompatible = LanguageUtils.areLanguageCompatible;
-
-    it('works for language', function() {
-      expect(areLanguageCompatible('en', 'en')).toBeTruthy();
-      expect(areLanguageCompatible('en', 'fr')).toBeFalsy();
-    });
-
-    it('works for language and region', function() {
-      expect(areLanguageCompatible('en-US', 'en-US')).toBeTruthy();
-      expect(areLanguageCompatible('en-US', 'en-CA')).toBeTruthy();
-      expect(areLanguageCompatible('en-CA', 'fr-CA')).toBeFalsy();
-    });
-
-    it('works for dialects', function() {
-      expect(areLanguageCompatible('en-US-tx', 'en-US-wa')).toBeTruthy();
+    it('ignores dialect', () => {
+      expect(LanguageUtils.areLocaleCompatible(
+          'en-US-tx', 'en-US-wa')).toBeTruthy();
     });
   });
 
-  describe('isSiblingOf', function() {
-    const isSiblingOf = shaka.util.LanguageUtils.isSiblingOf;
-
-    it('accepts self', function() {
-      expect(isSiblingOf('en-US', 'en-US')).toBeTruthy();
+  describe('areLanguageCompatible', () => {
+    it('works for language', () => {
+      expect(LanguageUtils.areLanguageCompatible('en', 'en')).toBeTruthy();
+      expect(LanguageUtils.areLanguageCompatible('en', 'fr')).toBeFalsy();
     });
 
-    it('rejects other languages', function() {
-      expect(isSiblingOf('en-CA', 'fr-CA')).toBeFalsy();
+    it('works for language and region', () => {
+      expect(LanguageUtils.areLanguageCompatible(
+          'en-US', 'en-US')).toBeTruthy();
+      expect(LanguageUtils.areLanguageCompatible(
+          'en-US', 'en-CA')).toBeTruthy();
+      expect(LanguageUtils.areLanguageCompatible('en-CA', 'fr-CA')).toBeFalsy();
     });
 
-    it('requires region', function() {
-      expect(isSiblingOf('en', 'en')).toBeFalsy();
-      expect(isSiblingOf('en-US', 'en')).toBeFalsy();
-    });
-  });
-
-  describe('isParentOf', function() {
-    const isParentOf = shaka.util.LanguageUtils.isParentOf;
-
-    it('rejects self', function() {
-      expect(isParentOf('en', 'en')).toBeFalsy();
-    });
-
-    it('rejects other languages', function() {
-      expect(isParentOf('en', 'fr')).toBeFalsy();
-    });
-
-    it('requires region', function() {
-      expect(isParentOf('en', 'en-US')).toBeTruthy();
-      expect(isParentOf('en', 'en-CA')).toBeTruthy();
+    it('works for dialects', () => {
+      expect(LanguageUtils.areLanguageCompatible(
+          'en-US-tx', 'en-US-wa')).toBeTruthy();
     });
   });
 
-  describe('findClosestLocale', function() {
-    const findClosestLocale = shaka.util.LanguageUtils.findClosestLocale;
+  describe('isSiblingOf', () => {
+    it('accepts self', () => {
+      expect(LanguageUtils.isSiblingOf('en-US', 'en-US')).toBeTruthy();
+    });
 
-    it('returns null when nothing is found', function() {
+    it('rejects other languages', () => {
+      expect(LanguageUtils.isSiblingOf('en-CA', 'fr-CA')).toBeFalsy();
+    });
+
+    it('requires region', () => {
+      expect(LanguageUtils.isSiblingOf('en', 'en')).toBeFalsy();
+      expect(LanguageUtils.isSiblingOf('en-US', 'en')).toBeFalsy();
+    });
+  });
+
+  describe('isParentOf', () => {
+    it('rejects self', () => {
+      expect(LanguageUtils.isParentOf('en', 'en')).toBeFalsy();
+    });
+
+    it('rejects other languages', () => {
+      expect(LanguageUtils.isParentOf('en', 'fr')).toBeFalsy();
+    });
+
+    it('requires region', () => {
+      expect(LanguageUtils.isParentOf('en', 'en-US')).toBeTruthy();
+      expect(LanguageUtils.isParentOf('en', 'en-CA')).toBeTruthy();
+    });
+  });
+
+  describe('findClosestLocale', () => {
+    it('returns null when nothing is found', () => {
       const options = ['fr', 'en', 'es'];
       const empty = [];
 
-      expect(findClosestLocale('zh', options)).toBe(null);
-      expect(findClosestLocale('zh', empty)).toBe(null);
+      expect(LanguageUtils.findClosestLocale('zh', options)).toBe(null);
+      expect(LanguageUtils.findClosestLocale('zh', empty)).toBe(null);
     });
 
-    it('finds locale compatible matches', function() {
+    it('finds locale compatible matches', () => {
       const options = ['fr', 'en', 'en-US', 'es'];
 
-      expect(findClosestLocale('en', options)).toBe('en');
-      expect(findClosestLocale('en-US', options)).toBe('en-US');
+      expect(LanguageUtils.findClosestLocale('en', options)).toBe('en');
+      expect(LanguageUtils.findClosestLocale('en-US', options)).toBe('en-US');
     });
 
-    it('find language matches', function() {
+    it('find language matches', () => {
       const options = ['en', 'fr', 'en-CA'];
       // Should pick 'en' over 'en-CA'.
-      expect(findClosestLocale('en-US', options)).toBe('en');
+      expect(LanguageUtils.findClosestLocale('en-US', options)).toBe('en');
     });
 
-    it('finds language compatible matches', function() {
+    it('finds language compatible matches', () => {
       const options = ['en-CA', 'en-US'];
 
       // Should return the first one that is language-compatible.
-      expect(findClosestLocale('en-UK', options)).toBe('en-CA');
+      expect(LanguageUtils.findClosestLocale('en-UK', options)).toBe('en-CA');
     });
   });
 
-  describe('normalize', function() {
-    const normalize = shaka.util.LanguageUtils.normalize;
-
-    it('standardizes base language', function() {
-      expect(normalize('eng')).toBe('en');
-      expect(normalize('ENG')).toBe('en');
-      expect(normalize('EN')).toBe('en');
+  describe('normalize', () => {
+    it('standardizes base language', () => {
+      expect(LanguageUtils.normalize('eng')).toBe('en');
+      expect(LanguageUtils.normalize('ENG')).toBe('en');
+      expect(LanguageUtils.normalize('EN')).toBe('en');
     });
 
-    it('standardized region', function() {
-      expect(normalize('en-US')).toBe('en-US');
-      expect(normalize('en-us')).toBe('en-US');
+    it('standardized region', () => {
+      expect(LanguageUtils.normalize('en-US')).toBe('en-US');
+      expect(LanguageUtils.normalize('en-us')).toBe('en-US');
     });
 
-    it('ignored unknown base languages', function() {
-      expect(normalize('elvish')).toBe('elvish');
-      expect(normalize('elvish-woodland')).toBe('elvish-WOODLAND');
+    it('ignored unknown base languages', () => {
+      expect(LanguageUtils.normalize('elvish')).toBe('elvish');
+      expect(LanguageUtils.normalize(
+          'elvish-woodland')).toBe('elvish-WOODLAND');
     });
   });
 
-  describe('getLanguageForText', function() {
-    const getLocaleForText = shaka.util.LanguageUtils.getLocaleForText;
-
+  describe('getLocaleForText', () => {
     const notNormalEnglish = 'eng';
     const english = 'en';
 
-    it('normalizes language', function() {
+    it('normalizes language', () => {
       const stream = makeTextStream(notNormalEnglish);
-      expect(getLocaleForText(stream)).toBe(english);
+      expect(LanguageUtils.getLocaleForText(stream)).toBe(english);
     });
 
     /**
@@ -166,67 +157,64 @@ describe('LanguageUtils', function() {
     }
   });
 
-  describe('getLanguageForVariant', function() {
-    const LanguageUtils = shaka.util.LanguageUtils;
-    const getLocaleForVariant = LanguageUtils.getLocaleForVariant;
-
+  describe('getLocaleForVariant', () => {
     const notNormalEnglish = 'eng';
     const english = 'en';
     const french = 'fr';
 
-    it('normalizes language from variant', function() {
+    it('normalizes language from variant', () => {
       const variant = makeVariant(notNormalEnglish, '', '');
-      expect(getLocaleForVariant(variant)).toBe(english);
+      expect(LanguageUtils.getLocaleForVariant(variant)).toBe(english);
     });
 
-    it('normalizes language from audio', function() {
+    it('normalizes language from audio', () => {
       const variant = makeVariant('', notNormalEnglish, '');
-      expect(getLocaleForVariant(variant)).toBe(english);
+      expect(LanguageUtils.getLocaleForVariant(variant)).toBe(english);
     });
 
-    it('normalizes language from video', function() {
+    it('normalizes language from video', () => {
       const variant = makeVariant('', '', notNormalEnglish);
-      expect(getLocaleForVariant(variant)).toBe(english);
+      expect(LanguageUtils.getLocaleForVariant(variant)).toBe(english);
     });
 
-    it('gets language when only in variant', function() {
+    it('gets language when only in variant', () => {
       const variant = makeVariant(english, '', '');
-      expect(getLocaleForVariant(variant)).toBe(english);
+      expect(LanguageUtils.getLocaleForVariant(variant)).toBe(english);
     });
 
-    it('gets language when only in audio stream', function() {
+    it('gets language when only in audio stream', () => {
       const variant = makeVariant('', english, '');
-      expect(getLocaleForVariant(variant)).toBe(english);
+      expect(LanguageUtils.getLocaleForVariant(variant)).toBe(english);
     });
 
-    it('gets language when only in video stream', function() {
+    it('gets language when only in video stream', () => {
       const variant = makeVariant('', '', english);
-      expect(getLocaleForVariant(variant)).toBe(english);
+      expect(LanguageUtils.getLocaleForVariant(variant)).toBe(english);
     });
 
-    it('prefers variant over audio', function() {
+    it('prefers variant over audio', () => {
       const variant = makeVariant(english, french, '');
-      expect(getLocaleForVariant(variant)).toBe(english);
+      expect(LanguageUtils.getLocaleForVariant(variant)).toBe(english);
     });
 
-    it('prefers variant over audio', function() {
+    it('prefers variant over audio', () => {
       const variant = makeVariant(english, french, '');
-      expect(getLocaleForVariant(variant)).toBe(english);
+      expect(LanguageUtils.getLocaleForVariant(variant)).toBe(english);
     });
 
-    it('prefers variant over video', function() {
+    it('prefers variant over video', () => {
       const variant = makeVariant(english, '', french);
-      expect(getLocaleForVariant(variant)).toBe(english);
+      expect(LanguageUtils.getLocaleForVariant(variant)).toBe(english);
     });
 
-    it('prefers audio over video', function() {
+    it('prefers audio over video', () => {
       const variant = makeVariant('', english, french);
-      expect(getLocaleForVariant(variant)).toBe(english);
+      expect(LanguageUtils.getLocaleForVariant(variant)).toBe(english);
     });
 
-    it('falls back to und', function() {
+    it('falls back to und', () => {
       const variant = makeVariant('', '', '');
-      expect(getLocaleForVariant(variant)).toBe('und');
+      expect(LanguageUtils.getLocaleForVariant(variant)).toBe('und');
     });
 
     /**

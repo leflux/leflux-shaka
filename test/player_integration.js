@@ -15,8 +15,9 @@
  * limitations under the License.
  */
 
-describe('Player', function() {
+describe('Player', () => {
   const Util = shaka.test.Util;
+  const waitUntilPlayheadReaches = Util.waitUntilPlayheadReaches;
 
   /** @type {!jasmine.Spy} */
   let onErrorSpy;
@@ -25,30 +26,29 @@ describe('Player', function() {
   let video;
   /** @type {shaka.Player} */
   let player;
-  /** @type {shaka.util.EventManager} */
+  /** @type {!shaka.util.EventManager} */
   let eventManager;
 
   let compiledShaka;
 
   beforeAll(async () => {
-    video = /** @type {!HTMLVideoElement} */ (document.createElement('video'));
-    video.width = 600;
-    video.height = 400;
-    video.muted = true;
+    video = shaka.util.Dom.createVideoElement();
     document.body.appendChild(video);
 
     compiledShaka = await Util.loadShaka(getClientArg('uncompiled'));
     await shaka.test.TestScheme.createManifests(compiledShaka, '_compiled');
   });
 
-  beforeEach(function() {
+  beforeEach(() => {
     player = new compiledShaka.Player(video);
 
     // Grab event manager from the uncompiled library:
     eventManager = new shaka.util.EventManager();
 
     onErrorSpy = jasmine.createSpy('onError');
-    onErrorSpy.and.callFake(function(event) { fail(event.detail); });
+    onErrorSpy.and.callFake((event) => {
+      fail(event.detail);
+    });
     eventManager.listen(player, 'error', Util.spyFunc(onErrorSpy));
   });
 
@@ -56,19 +56,14 @@ describe('Player', function() {
     eventManager.release();
 
     await player.destroy();
-
-    // Work-around: allow the Tizen media pipeline to cool down.
-    // Without this, Tizen's pipeline seems to hang in subsequent tests.
-    // TODO: file a bug on Tizen
-    await Util.delay(0.1);
   });
 
-  afterAll(function() {
+  afterAll(() => {
     document.body.removeChild(video);
   });
 
-  describe('attach', function() {
-    beforeEach(async function() {
+  describe('attach', () => {
+    beforeEach(async () => {
       // To test attach, we want to construct a player without a video element
       // attached in advance.  To do that, we destroy the player that was
       // constructed in the outermost beforeEach(), then construct a new one
@@ -77,22 +72,22 @@ describe('Player', function() {
       player = new compiledShaka.Player();
     });
 
-    it('can be used before load()', async function() {
+    it('can be used before load()', async () => {
       await player.attach(video);
       await player.load('test:sintel_compiled');
     });
   });
 
-  describe('getStats', function() {
+  describe('getStats', () => {
     it('gives stats about current stream', async () => {
       // This is tested more in player_unit.js.  This is here to test the public
       // API and to check for renaming.
       await player.load('test:sintel_compiled');
       video.play();
-      await waitUntilPlayheadReaches(video, 1, 10);
+      await waitUntilPlayheadReaches(eventManager, video, 1, 10);
 
-      let stats = player.getStats();
-      let expected = {
+      const stats = player.getStats();
+      const expected = {
         width: jasmine.any(Number),
         height: jasmine.any(Number),
         streamBandwidth: jasmine.any(Number),
@@ -103,6 +98,7 @@ describe('Player', function() {
 
         loadLatency: jasmine.any(Number),
         playTime: jasmine.any(Number),
+        pauseTime: jasmine.any(Number),
         bufferingTime: jasmine.any(Number),
 
         // We should have loaded the first Period by now, so we should have a
@@ -125,18 +121,18 @@ describe('Player', function() {
     });
   });
 
-  describe('setTextTrackVisibility', function() {
+  describe('setTextTrackVisibility', () => {
     // Using mode='disabled' on TextTrack causes cues to go null, which leads
     // to a crash in TextEngine.  This validates that we do not trigger this
     // behavior when changing visibility of text.
     it('does not cause cues to be null', async () => {
       await player.load('test:sintel_compiled');
       video.play();
-      await waitUntilPlayheadReaches(video, 1, 10);
+      await waitUntilPlayheadReaches(eventManager, video, 1, 10);
 
       // This TextTrack was created as part of load() when we set up the
       // TextDisplayer.
-      let textTrack = video.textTracks[0];
+      const textTrack = video.textTracks[0];
       expect(textTrack).not.toBe(null);
 
       if (textTrack) {
@@ -234,23 +230,45 @@ describe('Player', function() {
       const variantTrack = player.getVariantTracks()[0];
       expect(variantTrack.language).toEqual(textTrack.language);
     });
+
+    // Repro for https://github.com/google/shaka-player/issues/1879.
+    it('actually appends cues when enabled initially', async () => {
+      let cues = [];
+      /** @const {!shaka.test.FakeTextDisplayer} */
+      const displayer = new shaka.test.FakeTextDisplayer();
+      displayer.appendSpy.and.callFake((added) => {
+        cues = cues.concat(added);
+      });
+      displayer.removeSpy.and.callFake(() => {
+        cues = [];
+      });
+      player.configure({textDisplayFactory: () => displayer});
+
+      const preferredTextLanguage = 'fa';  // The same as in the content itself
+      player.configure({preferredTextLanguage: preferredTextLanguage});
+
+      await player.load('test:sintel_realistic_compiled');
+      await Util.delay(1);  // Allow the first segments to be appended.
+
+      expect(player.isTextTrackVisible()).toBe(true);
+      expect(displayer.isTextVisible()).toBe(true);
+      expect(cues.length).toBeGreaterThan(0);
+    });
   });
 
-  describe('plays', function() {
+  describe('plays', () => {
     it('with external text tracks', async () => {
       await player.load('test:sintel_no_text_compiled');
+
       // For some reason, using path-absolute URLs (i.e. without the hostname)
       // like this doesn't work on Safari.  So manually resolve the URL.
-      let locationUri = new goog.Uri(location.href);
-      let partialUri = new goog.Uri('/base/test/test/assets/text-clip.vtt');
-      let absoluteUri = locationUri.resolve(partialUri);
-      player.addTextTrack(absoluteUri.toString(), 'en', 'subtitles',
-                          'text/vtt');
+      const locationUri = new goog.Uri(location.href);
+      const partialUri = new goog.Uri('/base/test/test/assets/text-clip.vtt');
+      const absoluteUri = locationUri.resolve(partialUri);
+      await player.addTextTrack(absoluteUri.toString(), 'en', 'subtitles',
+          'text/vtt');
 
-      video.play();
-      await Util.delay(5);
-
-      let textTracks = player.getTextTracks();
+      const textTracks = player.getTextTracks();
       expect(textTracks).toBeTruthy();
       expect(textTracks.length).toBe(1);
 
@@ -273,21 +291,21 @@ describe('Player', function() {
       player.configure({preferredAudioLanguage: 'en'});
       await player.load('test:sintel_short_periods_compiled');
       video.play();
-      await waitUntilPlayheadReaches(video, 8, 30);
+      await waitUntilPlayheadReaches(eventManager, video, 8, 30);
 
       // The Period changes at 10 seconds.  Assert that we are in the previous
       // Period and have buffered into the next one.
       expect(video.currentTime).toBeLessThan(9);
       // The two periods might not be in a single contiguous buffer, so don't
       // check end(0).  Gap-jumping will deal with any discontinuities.
-      let bufferEnd = video.buffered.end(video.buffered.length - 1);
+      const bufferEnd = video.buffered.end(video.buffered.length - 1);
       expect(bufferEnd).toBeGreaterThan(11);
 
       // Change to a different language; this should clear the buffers and
       // cause a Period transition again.
       expect(getActiveLanguage()).toBe('en');
       player.selectAudioLanguage('es');
-      await waitUntilPlayheadReaches(video, 21, 30);
+      await waitUntilPlayheadReaches(eventManager, video, 21, 30);
 
       // Should have gotten past the next Period transition and still be
       // playing the new language.
@@ -299,7 +317,7 @@ describe('Player', function() {
      * @return {string}
      */
     function getActiveLanguage() {
-      let tracks = player.getVariantTracks().filter(function(t) {
+      const tracks = player.getVariantTracks().filter((t) => {
         return t.active;
       });
       expect(tracks.length).toBeGreaterThan(0);
@@ -307,11 +325,11 @@ describe('Player', function() {
     }
   });
 
-  describe('TextDisplayer plugin', function() {
+  describe('TextDisplayer plugin', () => {
     // Simulate the use of an external TextDisplayer plugin.
     /** @type {shaka.test.FakeTextDisplayer} */
     let textDisplayer;
-    beforeEach(function() {
+    beforeEach(() => {
       textDisplayer = new shaka.test.FakeTextDisplayer();
 
       textDisplayer.isTextVisibleSpy.and.callFake(() => {
@@ -332,7 +350,7 @@ describe('Player', function() {
     it('does not throw on destroy', async () => {
       await player.load('test:sintel_compiled');
       video.play();
-      await waitUntilPlayheadReaches(video, 1, 10);
+      await waitUntilPlayheadReaches(eventManager, video, 1, 10);
       await player.unload();
       // Before we fixed #1187, the call to destroy() on textDisplayer was
       // renamed in the compiled version and could not be called.
@@ -340,53 +358,53 @@ describe('Player', function() {
     });
   });
 
-  describe('TextAndRoles', function() {
+  describe('TextAndRoles', () => {
     // Regression Test. Makes sure that the language and role fields have been
     // properly exported from the player.
     it('exports language and roles fields', async () => {
       await player.load('test:sintel_compiled');
-      let languagesAndRoles = player.getTextLanguagesAndRoles();
+      const languagesAndRoles = player.getTextLanguagesAndRoles();
       expect(languagesAndRoles.length).toBeTruthy();
-      languagesAndRoles.forEach((languageAndRole) => {
+      for (const languageAndRole of languagesAndRoles) {
         expect(languageAndRole.language).not.toBeUndefined();
         expect(languageAndRole.role).not.toBeUndefined();
-      });
+      }
     });
   });
 
-  describe('streaming event', function() {
+  describe('streaming event', () => {
     // Calling switch early during load() caused a failed assertion in Player
     // and the track selection was ignored.  Because this bug involved
     // interactions between Player and StreamingEngine, it is an integration
     // test and not a unit test.
     // https://github.com/google/shaka-player/issues/1119
-    it('allows early selection of specific tracks', function(done) {
+    it('allows early selection of specific tracks', async () => {
+      /** @type {!jasmine.Spy} */
       const streamingListener = jasmine.createSpy('listener');
 
       // Because this is an issue with failed assertions, destroy the existing
       // player from the compiled version, and create a new one using the
       // uncompiled version.  Then we will get assertions.
       eventManager.unlisten(player, 'error');
-      player.destroy().then(() => {
-        player = new shaka.Player(video);
-        player.configure({abr: {enabled: false}});
-        eventManager.listen(player, 'error', Util.spyFunc(onErrorSpy));
+      await player.destroy();
+      player = new shaka.Player(video);
+      player.configure({abr: {enabled: false}});
+      eventManager.listen(player, 'error', Util.spyFunc(onErrorSpy));
 
-        // When 'streaming' fires, select the first track explicitly.
-        player.addEventListener('streaming', Util.spyFunc(streamingListener));
-        streamingListener.and.callFake(() => {
-          const tracks = player.getVariantTracks();
-          player.selectVariantTrack(tracks[0]);
-        });
+      // When 'streaming' fires, select the first track explicitly.
+      player.addEventListener('streaming', Util.spyFunc(streamingListener));
+      streamingListener.and.callFake(() => {
+        const tracks = player.getVariantTracks();
+        player.selectVariantTrack(tracks[0]);
+      });
 
-        // Now load the content.
-        return player.load('test:sintel');
-      }).then(() => {
-        // When the bug triggers, we fail assertions in Player.
-        // Make sure the listener was triggered, so that it could trigger the
-        // code path in this bug.
-        expect(streamingListener).toHaveBeenCalled();
-      }).catch(fail).then(done);
+      // Now load the content.
+      await player.load('test:sintel');
+
+      // When the bug triggers, we fail assertions in Player.
+      // Make sure the listener was triggered, so that it could trigger the
+      // code path in this bug.
+      expect(streamingListener).toHaveBeenCalled();
     });
 
     // After fixing the issue above, calling switch early during a second load()
@@ -395,67 +413,45 @@ describe('Player', function() {
     // between Player and StreamingEngine, it is an integration test and not a
     // unit test.
     // https://github.com/google/shaka-player/issues/1119
-    it('allows selection of tracks in subsequent loads', function(done) {
+    it('allows selection of tracks in subsequent loads', async () => {
+      /** @type {!jasmine.Spy} */
       const streamingListener = jasmine.createSpy('listener');
 
       // Because this is an issue with failed assertions, destroy the existing
       // player from the compiled version, and create a new one using the
       // uncompiled version.  Then we will get assertions.
       eventManager.unlisten(player, 'error');
-      player.destroy().then(() => {
-        player = new shaka.Player(video);
-        player.configure({abr: {enabled: false}});
-        eventManager.listen(player, 'error', Util.spyFunc(onErrorSpy));
+      await player.destroy();
+      player = new shaka.Player(video);
+      player.configure({abr: {enabled: false}});
+      eventManager.listen(player, 'error', Util.spyFunc(onErrorSpy));
 
-        // This bug only triggers when you do this on the second load.
-        // So we load one piece of content, then set up the streaming listener
-        // to change tracks, then we load a second piece of content.
-        return player.load('test:sintel');
-      }).then(() => {
-        // Give StreamingEngine time to complete all setup and to call back into
-        // the Player with canSwitch_.  If you move on too quickly to the next
-        // load(), the bug does not reproduce.
-        return shaka.test.Util.delay(1);
-      }).then(() => {
-        player.addEventListener('streaming', Util.spyFunc(streamingListener));
+      // This bug only triggers when you do this on the second load.
+      // So we load one piece of content, then set up the streaming listener
+      // to change tracks, then we load a second piece of content.
+      await player.load('test:sintel');
 
-        streamingListener.and.callFake(() => {
-          const track = player.getVariantTracks()[0];
-          player.selectVariantTrack(track);
-        });
+      // Give StreamingEngine time to complete all setup and to call back into
+      // the Player with canSwitch_.  If you move on too quickly to the next
+      // load(), the bug does not reproduce.
+      await shaka.test.Util.delay(1);
 
-        // Now load again to trigger the failed assertion.
-        return player.load('test:sintel');
-      }).then(() => {
-        // When the bug triggers, we fail assertions in StreamingEngine.
-        // So just make sure the listener was triggered, so that it could
-        // trigger the code path in this bug.
-        expect(streamingListener).toHaveBeenCalled();
-      }).catch(fail).then(done);
+      player.addEventListener('streaming', Util.spyFunc(streamingListener));
+
+      streamingListener.and.callFake(() => {
+        const track = player.getVariantTracks()[0];
+        player.selectVariantTrack(track);
+      });
+
+      // Now load again to trigger the failed assertion.
+      await player.load('test:sintel');
+
+      // When the bug triggers, we fail assertions in StreamingEngine.
+      // So just make sure the listener was triggered, so that it could
+      // trigger the code path in this bug.
+      expect(streamingListener).toHaveBeenCalled();
     });
   });
-
-  /**
-   * @param {!HTMLMediaElement} video
-   * @param {number} playheadTime The time to wait for.
-   * @param {number} timeout in seconds, after which the Promise fails
-   * @return {!Promise}
-   */
-  function waitUntilPlayheadReaches(video, playheadTime, timeout) {
-    let curEventManager = eventManager;
-    return new Promise(function(resolve, reject) {
-      curEventManager.listen(video, 'timeupdate', function() {
-        if (video.currentTime >= playheadTime) {
-          curEventManager.unlisten(video, 'timeupdate');
-          resolve();
-        }
-      });
-      Util.delay(timeout).then(function() {
-        curEventManager.unlisten(video, 'timeupdate');
-        reject('Timeout waiting for time');
-      });
-    });
-  }
 });
 
 // TODO(vaage): Try to group the stat tests together.
@@ -487,7 +483,11 @@ describe('Player Stats', () => {
 //
 // TODO: Any call to |load|, |attach|, etc. should abort manifest retries.
 //       Add the missing tests for |load| and |attach|.
-describe('Player Manifest Retries', function() {
+describe('Player Manifest Retries', () => {
+  const interruptedError = shaka.test.Util.jasmineError(new shaka.util.Error(
+      shaka.util.Error.Severity.CRITICAL, shaka.util.Error.Category.PLAYER,
+      shaka.util.Error.Code.LOAD_INTERRUPTED));
+
   /** @type {!HTMLVideoElement} */
   let video;
   /** @type {shaka.Player} */
@@ -497,10 +497,7 @@ describe('Player Manifest Retries', function() {
   let stateChangeSpy;
 
   beforeAll(() => {
-    video = /** @type {!HTMLVideoElement} */ (document.createElement('video'));
-    video.width = 600;
-    video.height = 400;
-    video.muted = true;
+    video = shaka.util.Dom.createVideoElement();
     document.body.appendChild(video);
 
     // For these tests, we don't want any network requests to succeed. We want
@@ -532,65 +529,20 @@ describe('Player Manifest Retries', function() {
 
   it('unload prevents further manifest load retries', async () => {
     const loading = player.load('reject://www.foo.com/bar.mpd');
-
-    // Wait until we are part way through the load process so that we can ensure
-    // we are interrupting mid-way.
-    await new Promise((resolve) => stateChangeSpy.and.callFake((event) => {
-      if (event.state == 'manifest-parser') {
-        resolve();
-      }
-    }));
-
-    await player.unload();
-
-    try {
-      await loading;
-      fail();
-    } catch (e) {
-      expect(e.code).toBe(shaka.util.Error.Code.LOAD_INTERRUPTED);
-    }
+    entersState('manifest-parser', () => player.unload());
+    await expectAsync(loading).toBeRejectedWith(interruptedError);
   });
 
   it('detach prevents further manifest load retries', async () => {
     const loading = player.load('reject://www.foo.com/bar.mpd');
-
-    // Wait until we are part way through the load process so that we can ensure
-    // we are interrupting mid-way.
-    await new Promise((resolve) => stateChangeSpy.and.callFake((event) => {
-      if (event.state == 'manifest-parser') {
-        resolve();
-      }
-    }));
-
-    await player.detach();
-
-    try {
-      await loading;
-      fail();
-    } catch (e) {
-      expect(e.code).toBe(shaka.util.Error.Code.LOAD_INTERRUPTED);
-    }
+    entersState('manifest-parser', () => player.detach());
+    await expectAsync(loading).toBeRejectedWith(interruptedError);
   });
 
   it('destroy prevents further manifest load retries', async () => {
     const loading = player.load('reject://www.foo.com/bar.mpd');
-
-    // Wait until we are part way through the load process so that we can ensure
-    // we are interrupting mid-way.
-    await new Promise((resolve) => stateChangeSpy.and.callFake((event) => {
-      if (event.state == 'manifest-parser') {
-        resolve();
-      }
-    }));
-
-    await player.destroy();
-
-    try {
-      await loading;
-      fail();
-    } catch (e) {
-      expect(e.code).toBe(shaka.util.Error.Code.LOAD_INTERRUPTED);
-    }
+    entersState('manifest-parser', () => player.destroy());
+    await expectAsync(loading).toBeRejectedWith(interruptedError);
   });
 
   /**
@@ -607,19 +559,28 @@ describe('Player Manifest Retries', function() {
 
     return shaka.util.AbortableOperation.failed(error);
   }
+
+  /**
+   * Call |doThis| when the player enters a specific state.
+   *
+   * @param {string} stateName
+   * @param {function()} doThis
+   */
+  function entersState(stateName, doThis) {
+    stateChangeSpy.and.callFake((event) => {
+      if (event.state == stateName) {
+        doThis();
+      }
+    });
+  }
 });
 
 
 // This test suite focuses on how the player moves through the different load
 // states.
-//
-// TODO(vaage): Some test cases are missing and need to be added when the
-//              the required load states are added:
-//                - Creating the manifest parser
-//                - Parsing the manifest
-//                - Creating drm engine
-//                - Creating streaming engine
 describe('Player Load Path', () => {
+  const SMALL_MP4_CONTENT_URI = '/base/test/test/assets/small.mp4';
+
   /** @type {!HTMLVideoElement} */
   let video;
   /** @type {shaka.Player} */
@@ -632,10 +593,7 @@ describe('Player Load Path', () => {
   let stateIdleSpy;
 
   beforeAll(async () => {
-    video = /** @type {!HTMLVideoElement} */ (document.createElement('video'));
-    video.width = 600;
-    video.height = 400;
-    video.muted = true;
+    video = shaka.util.Dom.createVideoElement();
     document.body.appendChild(video);
 
     await shaka.test.TestScheme.createManifests(shaka, '_compiled');
@@ -683,14 +641,14 @@ describe('Player Load Path', () => {
         expect(video.src).toBeTruthy();
       });
 
-  it('does not set video.src when no video is provided', async function() {
+  it('does not set video.src when no video is provided', async () => {
     expect(video.src).toBeFalsy();
 
     createPlayer(/* attachedTo= */ null);
 
     // Wait until the player has hit an idle state (no more internal loading
     // actions).
-    await new Promise((resolve) => stateIdleSpy.and.callFake(resolve));
+    await spyIsCalled(stateIdleSpy);
 
     expect(video.src).toBeFalsy();
   });
@@ -790,24 +748,25 @@ describe('Player Load Path', () => {
 
     expect(getVisitedStates()).toEqual([
       'attach',
+      'media-source',
 
       // Load and unload 1
-      'media-source',
       'manifest-parser',
       'manifest',
       'drm-engine',
       'load',
       'unload',
       'attach',
+      'media-source',
 
       // Load and unload 2
-      'media-source',
       'manifest-parser',
       'manifest',
       'drm-engine',
       'load',
       'unload',
       'attach',
+      'media-source',
     ]);
   });
 
@@ -859,12 +818,12 @@ describe('Player Load Path', () => {
     const load2 = player.load('test:sintel');
 
     // Load 1 should have been interrupted because of load 2.
-    await rejected(load1);
+    await expectAsync(load1).toBeRejected();
     // Load 2 should finish with no issues.
     await load2;
   });
 
-  it('unload will interupt load', async () => {
+  it('unload will interrupt load', async () => {
     createPlayer(/* attachedTo= */ null);
 
     await player.attach(video);
@@ -872,7 +831,7 @@ describe('Player Load Path', () => {
     const load = player.load('test:sintel');
     const unload = player.unload();
 
-    await rejected(load);
+    await expectAsync(load).toBeRejected();
     await unload;
 
     // We should never have gotten into the loaded state.
@@ -887,7 +846,7 @@ describe('Player Load Path', () => {
     const load = player.load('test:sintel');
     const destroy = player.destroy();
 
-    await rejected(load);
+    await expectAsync(load).toBeRejected();
     await destroy;
 
     // We should never have gotten into the loaded state.
@@ -931,23 +890,25 @@ describe('Player Load Path', () => {
     await player.unload();
 
     expect(getVisitedStates()).toEqual([
+      // |player.attach|
       'attach',
-
-      // First call to |load|.
       'media-source',
+
+      // |player.load|
       'manifest-parser',
       'manifest',
       'drm-engine',
       'load',
 
-      // First call to unload will unload everything and then move us to the
-      // attached state.
+      // |player.unload| (first call)
       'unload',
       'attach',
+      'media-source',
 
-      // Second call to unload will make us re-enter the attached state since
-      // there is nothing to unload.
+      // |player.unload| (second call)
+      'unload',
       'attach',
+      'media-source',
     ]);
   });
 
@@ -983,29 +944,29 @@ describe('Player Load Path', () => {
   // pre-initialize media source engine, we do not re-create the media source
   // instance when loading.
   it('pre-initialized media source is used when player continues loading',
-    async () => {
-      createPlayer(/* attachedTo= */ null);
+      async () => {
+        createPlayer(/* attachedTo= */ null);
 
-      // After we attach and initialize media source, we should just see
-      // two states in our history.
-      await player.attach(video, /* initializeMediaSource= */ true);
-      expect(getVisitedStates()).toEqual([
-        'attach',
-        'media-source',
-      ]);
+        // After we attach and initialize media source, we should just see
+        // two states in our history.
+        await player.attach(video, /* initializeMediaSource= */ true);
+        expect(getVisitedStates()).toEqual([
+          'attach',
+          'media-source',
+        ]);
 
-      // When we load, the only change in the visited states should be that
-      // we added "load".
-      await player.load('test:sintel');
-      expect(getVisitedStates()).toEqual([
-        'attach',
-        'media-source',
-        'manifest-parser',
-        'manifest',
-        'drm-engine',
-        'load',
-      ]);
-    });
+        // When we load, the only change in the visited states should be that
+        // we added "load".
+        await player.load('test:sintel');
+        expect(getVisitedStates()).toEqual([
+          'attach',
+          'media-source',
+          'manifest-parser',
+          'manifest',
+          'drm-engine',
+          'load',
+        ]);
+      });
 
   // We want to make sure that we can interrupt the load process at key-points
   // in time. After each node in the graph, we should be able to reroute and do
@@ -1028,13 +989,13 @@ describe('Player Load Path', () => {
 
       let pendingUnload;
       whenEnteringState(state, () => {
-        pendingUnload = player.unload();
+        pendingUnload = player.unload(/* initMediaSource= */ false);
       });
 
       // We attach manually so that we had time to override the state change
       // spy's action.
       await player.attach(video);
-      await rejected(player.load('test:sintel'));
+      await expectAsync(player.load('test:sintel')).toBeRejected();
 
       // By the time that |player.load| failed, we should have started
       // |player.unload|.
@@ -1077,23 +1038,17 @@ describe('Player Load Path', () => {
             shaka.util.Error.Code.REQUEST_FILTER_ERROR);
       });
 
-      /** @type {jasmine.Spy} */
-      const idleSpy = jasmine.createSpy('idle state');
-      player.addEventListener('onstateidle', shaka.test.Util.spyFunc(idleSpy));
-
       // Make the two requests one-after-another so that we don't have any idle
       // time between them.
       const attachRequest = player.attach(video);
       const loadRequest = player.load('test:sintel');
 
       await attachRequest;
-      await rejected(loadRequest);
+      await expectAsync(loadRequest).toBeRejected();
 
       // Wait a couple interrupter cycles to allow the player to enter idle
       // state.
-      const event = await new Promise((resolve) => {
-        idleSpy.and.callFake(resolve);
-      });
+      const event = await spyIsCalled(stateIdleSpy);
 
       // Since attached and loaded in the same interrupter cycle, there won't be
       // any idle time until we finish failing to load. We expect to idle in
@@ -1102,21 +1057,449 @@ describe('Player Load Path', () => {
     });
   });
 
-  /**
-   * Wait for |p| to be rejected. If |p| is not rejected, this will fail the
-   * test;
-   *
-   * @param {!Promise} p
-   * @return {!Promise}
-   */
-  async function rejected(p) {
-    try {
-      await p;
-      fail();
-    } catch (e) {
-      expect(e).toBeTruthy();
+  // Some platforms will not have media source support, so we want to make sure
+  // that the player will behave as expected when media source is missing.
+  describe('without media source', () => {
+    let mediaSource;
+
+    beforeEach(async () => {
+      // Remove our media source support. In order to remove it, we need to set
+      // it via [] notation or else closure will stop us.
+      mediaSource = window.MediaSource;
+      window['MediaSource'] = undefined;
+
+      createPlayer(/* attachTo= */ null);
+      await spyIsCalled(stateIdleSpy);
+    });
+
+    afterEach(() => {
+      // Restore our media source support to what it was before. If we did not
+      // have support before, this will do nothing.
+      window['MediaSource'] = mediaSource;
+    });
+
+    it('attaching ignores init media source flag', async () => {
+      // Normally the player would initialize media source after attaching to
+      // the media element, however since we don't support media source, it
+      // should stop at the attach state.
+      player.attach(video, /* initMediaSource= */ true);
+
+      const event = await spyIsCalled(stateIdleSpy);
+      expect(event.state).toBe('attach');
+    });
+
+    it('loading ignores media source path', async () => {
+      await player.attach(video, /* initMediaSource= */ false);
+
+      // Normally the player would load content like this with the media source
+      // path, but since we don't have media source support, it should use the
+      // src= path.
+      player.load(SMALL_MP4_CONTENT_URI);
+
+      const event = await spyIsCalled(stateIdleSpy);
+      expect(event.state).toBe('src-equals');
+    });
+
+    it('unloading ignores init media source flag', async () => {
+      await player.attach(video, /* initMediaSource= */ false);
+      await player.load(SMALL_MP4_CONTENT_URI);
+
+      // Normally the player would try to go to the media source state because
+      // we are saying to initialize media source after unloading, but since we
+      // don't have media source, it should stop at the attach state.
+      player.unload(/* initMediaSource= */ true);
+
+      const event = await spyIsCalled(stateIdleSpy);
+      expect(event.state).toBe('attach');
+    });
+  });
+
+  // We want to make sure that we can move from any state to any of our
+  // destination states. This means moving to a state (directly or indirectly)
+  // and then telling it to go to one of our destination states (e.g. attach,
+  // load with media source, load with src=).
+  describe('routing', () => {
+    beforeEach(async () => {
+      createPlayer(/* attachedTo= */ null);
+      await spyIsCalled(stateIdleSpy);
+    });
+
+    it('goes from detach to detach', async () => {
+      await startIn('detach');
+      await goTo('detach');
+    });
+
+    it('goes from detach to attach', async () => {
+      await startIn('detach');
+      await goTo('attach');
+    });
+
+    it('goes from detach to media source', async () => {
+      await startIn('detach');
+      await goTo('media-source');
+    });
+
+    it('goes from attach to detach', async () => {
+      await startIn('attach');
+      await goTo('detach');
+    });
+
+    it('goes from attach to attach', async () => {
+      await startIn('attach');
+      await goTo('attach');
+    });
+
+    it('goes from attach to media source', async () => {
+      await startIn('attach');
+      await goTo('media-source');
+    });
+
+    it('goes from attach to load', async () => {
+      await startIn('attach');
+      await goTo('load');
+    });
+
+    it('goes from attach to src equals', async () => {
+      await startIn('attach');
+      await goTo('src-equals');
+    });
+
+    it('goes from media source to detach', async () => {
+      await startIn('media-source');
+      await goTo('detach');
+    });
+
+    it('goes from media source to attach', async () => {
+      await startIn('media-source');
+      await goTo('attach');
+    });
+
+    it('goes from media source to media source', async () => {
+      await startIn('media-source');
+      await goTo('media-source');
+    });
+
+    it('goes from media source to load', async () => {
+      await startIn('media-source');
+      await goTo('load');
+    });
+
+    it('goes from media source to src equals', async () => {
+      await startIn('media-source');
+      await goTo('src-equals');
+    });
+
+    it('goes from load to detach', async () => {
+      await startIn('load');
+      await goTo('detach');
+    });
+
+    it('goes from load to attach', async () => {
+      await startIn('load');
+      await goTo('attach');
+    });
+
+    it('goes from load to media source', async () => {
+      await startIn('load');
+      await goTo('media-source');
+    });
+
+    it('goes from load to load', async () => {
+      await startIn('load');
+      await goTo('load');
+    });
+
+    it('goes from load to src equals', async () => {
+      await startIn('load');
+      await goTo('src-equals');
+    });
+
+    it('goes from src equals to detach', async () => {
+      await startIn('src-equals');
+      await goTo('detach');
+    });
+
+    it('goes from src equals to attach', async () => {
+      await startIn('src-equals');
+      await goTo('attach');
+    });
+
+    it('goes from src equals to media source', async () => {
+      await startIn('src-equals');
+      await goTo('media-source');
+    });
+
+    it('goes from src equals to load', async () => {
+      await startIn('src-equals');
+      await goTo('load');
+    });
+
+    it('goes from src equals to src equals', async () => {
+      await startIn('src-equals');
+      await goTo('src-equals');
+    });
+
+    it('goes from manifest parser to detach', async () => {
+      await passingThrough('manifest-parser', () => {
+        return goTo('detach');
+      });
+    });
+
+    it('goes from manifest parser to attach', async () => {
+      await passingThrough('manifest-parser', () => {
+        return goTo('attach');
+      });
+    });
+
+    it('goes from manifest parser to media source', async () => {
+      await passingThrough('manifest-parser', () => {
+        return goTo('media-source');
+      });
+    });
+
+    it('goes from manifest parser to load', async () => {
+      await passingThrough('manifest-parser', () => {
+        return goTo('load');
+      });
+    });
+
+    it('goes from manifest parser to src equals', async () => {
+      await passingThrough('manifest-parser', () => {
+        return goTo('src-equals');
+      });
+    });
+
+    it('goes from manifest to detach', async () => {
+      await passingThrough('manifest', () => {
+        return goTo('detach');
+      });
+    });
+
+    it('goes from manifest to attach', async () => {
+      await passingThrough('manifest', () => {
+        return goTo('attach');
+      });
+    });
+
+    it('goes from manifest to media source', async () => {
+      await passingThrough('manifest', () => {
+        return goTo('media-source');
+      });
+    });
+
+    it('goes from manifest to load', async () => {
+      await passingThrough('manifest', () => {
+        return goTo('load');
+      });
+    });
+
+    it('goes from manifest to src equals', async () => {
+      await passingThrough('manifest', () => {
+        return goTo('src-equals');
+      });
+    });
+
+    it('goes from drm engine to detach', async () => {
+      await passingThrough('drm-engine', () => {
+        return goTo('detach');
+      });
+    });
+
+    it('goes from drm engine to attach', async () => {
+      await passingThrough('drm-engine', () => {
+        return goTo('attach');
+      });
+    });
+
+    it('goes from drm engine to media source', async () => {
+      await passingThrough('drm-engine', () => {
+        return goTo('media-source');
+      });
+    });
+
+    it('goes from drm engine to load', async () => {
+      await passingThrough('drm-engine', () => {
+        return goTo('load');
+      });
+    });
+
+    it('goes from drm engine to src equals', async () => {
+      await passingThrough('drm-engine', () => {
+        return goTo('src-equals');
+      });
+    });
+
+    it('goes from unload to detach', async () => {
+      await passingThrough('unload', () => {
+        return goTo('detach');
+      });
+    });
+
+    it('goes from unload to attach', async () => {
+      await passingThrough('unload', () => {
+        return goTo('attach');
+      });
+    });
+
+    it('goes from unload to media source', async () => {
+      await passingThrough('unload', () => {
+        return goTo('media-source');
+      });
+    });
+
+    it('goes from unload to load', async () => {
+      await passingThrough('unload', () => {
+        return goTo('load');
+      });
+    });
+
+    it('goes from unload to src equals', async () => {
+      await passingThrough('unload', () => {
+        return goTo('src-equals');
+      });
+    });
+
+    /**
+     * Put the player into the specific state. This method's purpose is to make
+     * it easier to see when the test is assuming the starting state of the
+     * player.
+     *
+     * For states that require the player to be attached to a media element,
+     * this will ensure that |attach| is called before making the call to move
+     * to the specific state.
+     *
+     * @param {string} state
+     * @return {!Promise}
+     */
+    async function startIn(state) {
+      /** @type {!Map.<string, function():!Promise>} */
+      const actions = new Map()
+          .set('detach', async () => {
+            await player.detach();
+          })
+          .set('attach', async () => {
+            await player.attach(video, /* initMediaSource= */ false);
+          })
+          .set('media-source', async () => {
+            await player.attach(video, /* initMediaSource= */ true);
+          })
+          .set('load', async () => {
+            await player.attach(video, /* initMediaSource= */ true);
+            await player.load('test:sintel');
+          })
+          .set('src-equals', async () => {
+            await player.attach(video, /* initMediaSource= */ false);
+            await player.load(SMALL_MP4_CONTENT_URI, 0, 'video/mp4');
+          });
+
+      const action = actions.get(state);
+      expect(action).toBeTruthy();
+
+      // Do not wait for the action to complete, our idle spy makes us wait. We
+      // want to know where we stop, so using the idle spy is more accurate in
+      // this situation.
+      action();
+
+      // Make sure that the player stops in the state that we asked it go to.
+      const event = await spyIsCalled(stateIdleSpy);
+      expect(event.state).toBe(state);
     }
-  }
+
+    /**
+     * Some states are intermediaries, making it impossible to "start" in them.
+     * Instead this method calls |doThis| when we are passing through the state.
+     * The goal of this method is to make it possible to test routing when the
+     * current route is interrupted to go somewhere.
+     *
+     * @param {string} state
+     * @param {function():!Promise} doThis
+     * @return {!Promise}
+     */
+    async function passingThrough(state, doThis) {
+      /** @type {!Set.<string>} */
+      const preLoadStates = new Set([
+        'manifest-parser',
+        'manifest',
+        'drm-engine',
+      ]);
+
+      /** @type {!Set.<string>} */
+      const postLoadStates = new Set([
+        'unload',
+      ]);
+
+      // Only a subset of the possible states are actually intermediary states.
+      const validState = preLoadStates.has(state) || postLoadStates.has(state);
+      expect(validState).toBeTruthy();
+
+      // We don't await the last action because it should not finish, however we
+      // need to handle the failure or else Jasmine will fail with "Unhandled
+      // rejection".
+      if (preLoadStates.has(state)) {
+        await player.attach(video);
+        player.load('test:sintel').catch(() => {});
+      } else {
+        await player.attach(video);
+        await player.load('test:sintel');
+        player.unload().catch(() => {});
+      }
+
+      return new Promise((resolve, reject) => {
+        let called = false;
+
+        whenEnteringState(state, () => {
+          // Make sure we don't execute more than once per promise.
+          if (called) {
+            return;
+          }
+          called = true;
+
+          // We need to call doThis in-sync with entering the state so that it
+          // can start in the same interpreter cycle. If we did not do this, the
+          // player could have changed states before |doThis| was called.
+          doThis().then(resolve, reject);
+        });
+      });
+    }
+
+    /**
+     * Go to a specific state. This does not ensure the current state before
+     * starting the state change.
+     *
+     * @param {string} state
+     * @return {!Promise}
+     */
+    async function goTo(state) {
+      /** @type {!Map.<string, function():!Promise>} */
+      const actions = new Map()
+          .set('detach', () => {
+            return player.detach();
+          })
+          .set('attach', () => {
+            return player.attach(video, /* initMediaSource= */ false);
+          })
+          .set('media-source', () => {
+            return player.attach(video, /* initMediaSource= */ true);
+          })
+          .set('load', () => {
+            return player.load('test:sintel');
+          })
+          .set('src-equals', () => {
+            return player.load(SMALL_MP4_CONTENT_URI, 0, 'video/mp4');
+          });
+
+      const action = actions.get(state);
+      expect(action).toBeTruthy();
+
+      // Do not wait for the action to complete, our idle spy make us wait. We
+      // want to know where we stop, so using the idle spy is more accurate in
+      // this situation.
+      action();
+
+      const event = await spyIsCalled(stateIdleSpy);
+      expect(event.state).toBe(state);
+    }
+  });
 
   /**
    * Get a list of all the states that the walker went through after
@@ -1145,6 +1528,18 @@ describe('Player Load Path', () => {
       if (event.state == state) {
         doThis();
       }
+    });
+  }
+
+  /**
+   * Wrap a spy in a promise so that it will resolve when the spy is called.
+   *
+   * @param {!jasmine.Spy} spy
+   * @return {!Promise}
+   */
+  function spyIsCalled(spy) {
+    return new Promise((resolve) => {
+      spy.and.callFake(resolve);
     });
   }
 });

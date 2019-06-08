@@ -16,28 +16,28 @@
  */
 
 
-describe('ManifestTextParser', function() {
+describe('ManifestTextParser', () => {
   /** @type {!shaka.hls.ManifestTextParser} */
   let parser;
 
-  beforeEach(function() {
+  beforeEach(() => {
     parser = new shaka.hls.ManifestTextParser();
   });
 
-  describe('parsePlaylist', function() {
-    it('rejects invalid playlists', function() {
+  describe('parsePlaylist', () => {
+    it('rejects invalid playlists', () => {
       verifyError('invalid playlist',
-                  shaka.util.Error.Code.HLS_PLAYLIST_HEADER_MISSING);
+          shaka.util.Error.Code.HLS_PLAYLIST_HEADER_MISSING);
 
       // This Master playlist is invalid cause it contains a segment tag.
       // All segment information should be in a Media playlist.
       verifyError('#EXTM3U\n' +
                   '#EXT-X-MEDIA:TYPE=AUDIO\n' +
                   '#EXTINF:6.00600',
-                  shaka.util.Error.Code.HLS_INVALID_PLAYLIST_HIERARCHY);
+      shaka.util.Error.Code.HLS_INVALID_PLAYLIST_HIERARCHY);
     });
 
-    it('parses a Media Playlist', function() {
+    it('parses a Media Playlist', () => {
       verifyPlaylist(
           {
             type: shaka.hls.PlaylistType.MEDIA,
@@ -54,7 +54,7 @@ describe('ManifestTextParser', function() {
           'https://test/manifest.m3u8');
     });
 
-    it('parses a Master Playlist', function() {
+    it('parses a Master Playlist', () => {
       verifyPlaylist(
           {
             type: shaka.hls.PlaylistType.MEDIA,
@@ -78,7 +78,7 @@ describe('ManifestTextParser', function() {
           'https://test/manifest.m3u8');
     });
 
-    it('ignores comments', function() {
+    it('ignores comments', () => {
       verifyPlaylist(
           {
             type: shaka.hls.PlaylistType.MEDIA,
@@ -101,22 +101,17 @@ describe('ManifestTextParser', function() {
      * @param {shaka.util.Error.Code} code
      */
     function verifyError(string, code) {
-      let data = shaka.util.StringUtils.toUTF8(string);
-      let error = new shaka.util.Error(
+      const data = shaka.util.StringUtils.toUTF8(string);
+      const error = shaka.test.Util.jasmineError(new shaka.util.Error(
           shaka.util.Error.Severity.CRITICAL,
           shaka.util.Error.Category.MANIFEST,
-          code);
-      try {
-        parser.parsePlaylist(data, /* uri */ '');
-        fail('Invalid HLS playlist should not be supported!');
-      } catch (e) {
-        shaka.test.Util.expectToEqualError(e, error);
-      }
+          code));
+      expect(() => parser.parsePlaylist(data, /* uri */ '')).toThrow(error);
     }
   });
 
-  describe('parseTag', function() {
-    it('parses tags with no attributes', function() {
+  describe('parseTag', () => {
+    it('parses tags with no attributes', () => {
       verifyPlaylist(
           {
             type: shaka.hls.PlaylistType.MASTER,
@@ -163,7 +158,7 @@ describe('ManifestTextParser', function() {
           'https://test/manifest.m3u8');
     });
 
-    it('parses tags with attributes', function() {
+    it('parses tags with attributes', () => {
       verifyPlaylist(
           {
             type: shaka.hls.PlaylistType.MASTER,
@@ -200,7 +195,7 @@ describe('ManifestTextParser', function() {
           'https://test/manifest.m3u8');
     });
 
-    it('parses tags with commas in attribute values', function() {
+    it('parses tags with commas in attribute values', () => {
       verifyPlaylist(
           {
             type: shaka.hls.PlaylistType.MASTER,
@@ -226,7 +221,7 @@ describe('ManifestTextParser', function() {
               new shaka.hls.Tag(/* id */ 1, 'EXT-X-MEDIA',
                   [
                     new shaka.hls.Attribute('CODECS',
-                                            'avc1.64002a,mp4a.40.2,avc2.64000'),
+                        'avc1.64002a,mp4a.40.2,avc2.64000'),
                   ]),
             ],
           },
@@ -245,7 +240,7 @@ describe('ManifestTextParser', function() {
               new shaka.hls.Tag(/* id */ 2, 'EXT-X-MEDIA',
                   [
                     new shaka.hls.Attribute('CODECS',
-                                            'avc1.64002a,mp4a.40.2'),
+                        'avc1.64002a,mp4a.40.2'),
                     new shaka.hls.Attribute('AUDIO', 'a1,a2'),
                   ]),
             ],
@@ -259,50 +254,45 @@ describe('ManifestTextParser', function() {
           'https://test/manifest.m3u8');
     });
 
-    it('rejects invalid tags', function() {
-      let error = new shaka.util.Error(
+    it('rejects invalid tags', () => {
+      const error = shaka.test.Util.jasmineError(new shaka.util.Error(
           shaka.util.Error.Severity.CRITICAL,
           shaka.util.Error.Category.MANIFEST,
           shaka.util.Error.Code.INVALID_HLS_TAG,
-          'invalid tag');
-      let text = shaka.util.StringUtils.toUTF8('#EXTM3U\ninvalid tag');
-      try {
-        parser.parsePlaylist(text, /* uri */ '');
-        fail('Invalid HLS tags should not be supported!');
-      } catch (e) {
-        shaka.test.Util.expectToEqualError(e, error);
-      }
+          'invalid tag'));
+      const text = shaka.util.StringUtils.toUTF8('#EXTM3U\ninvalid tag');
+      expect(() => parser.parsePlaylist(text, /* uri */ '')).toThrow(error);
     });
   });
 
-  describe('tag.toString', function() {
-    it('recreates valid tag with attributes', function() {
+  describe('tag.toString', () => {
+    it('recreates valid tag with attributes', () => {
       const text = '#EXT-X-MEDIA:CODECS="avc1.64002a,mp4a.40.2",AUDIO="a1,a2"';
-      let tag = shaka.hls.ManifestTextParser.parseTag(0, text);
+      const tag = shaka.hls.ManifestTextParser.parseTag(0, text);
       expect(text).toEqual(tag.toString());
     });
 
-    it('recreates valid tag with value', function() {
+    it('recreates valid tag with value', () => {
       const text = '#EXT-X-PLAYLIST-TYPE:VOD';
-      let tag = shaka.hls.ManifestTextParser.parseTag(0, text);
+      const tag = shaka.hls.ManifestTextParser.parseTag(0, text);
       expect(text).toEqual(tag.toString());
     });
 
-    it('recreates valid tag with no value', function() {
+    it('recreates valid tag with no value', () => {
       const text = '#EXTM3U';
-      let tag = shaka.hls.ManifestTextParser.parseTag(0, text);
+      const tag = shaka.hls.ManifestTextParser.parseTag(0, text);
       expect(text).toEqual(tag.toString());
     });
 
-    it('recreates valid tag with both value and attributes', function() {
+    it('recreates valid tag with both value and attributes', () => {
       const text = '#EXTINF:5.99467,pid=180';
-      let tag = shaka.hls.ManifestTextParser.parseTag(0, text);
+      const tag = shaka.hls.ManifestTextParser.parseTag(0, text);
       expect(text).toEqual(tag.toString());
     });
   });
 
-  describe('parseSegments', function() {
-    it('parses segments', function() {
+  describe('parseSegments', () => {
+    it('parses segments', () => {
       verifyPlaylist(
           {
             type: shaka.hls.PlaylistType.MEDIA,
@@ -327,7 +317,7 @@ describe('ManifestTextParser', function() {
           'https://test/manifest.m3u8');
     });
 
-    it('handles tags with both value and attributes', function() {
+    it('handles tags with both value and attributes', () => {
       verifyPlaylist(
           {
             type: shaka.hls.PlaylistType.MEDIA,
@@ -338,10 +328,10 @@ describe('ManifestTextParser', function() {
               new shaka.hls.Segment('https://test/test.mp4',
                   [
                     new shaka.hls.Tag(
-                      /* id */ 2,
-                      'EXTINF',
-                      [new shaka.hls.Attribute('pid', '180')],
-                      '5.99467'
+                        /* id */ 2,
+                        'EXTINF',
+                        [new shaka.hls.Attribute('pid', '180')],
+                        '5.99467'
                     ),
                   ]),
             ],
@@ -366,15 +356,15 @@ describe('ManifestTextParser', function() {
             ],
             segments: [
               new shaka.hls.Segment('https://test/test.mp4',
-                [
-                  new shaka.hls.Tag(/* id */ 1, 'EXT-X-KEY',
-                    [
-                      new shaka.hls.Attribute('METHOD', 'AES-128'),
-                      new shaka.hls.Attribute('URI', 'http://key.com'),
-                      new shaka.hls.Attribute('IV', '123'),
-                    ]),
-                  new shaka.hls.Tag(/* id */ 3, 'EXTINF', [], '5.99467'),
-                ]),
+                  [
+                    new shaka.hls.Tag(/* id */ 1, 'EXT-X-KEY',
+                        [
+                          new shaka.hls.Attribute('METHOD', 'AES-128'),
+                          new shaka.hls.Attribute('URI', 'http://key.com'),
+                          new shaka.hls.Attribute('IV', '123'),
+                        ]),
+                    new shaka.hls.Tag(/* id */ 3, 'EXTINF', [], '5.99467'),
+                  ]),
             ],
           },
 
@@ -389,7 +379,7 @@ describe('ManifestTextParser', function() {
           'https://test/manifest.m3u8');
     });
 
-    it('tracks playlist URI', function() {
+    it('tracks playlist URI', () => {
       verifyPlaylist(
           {
             absoluteUri: 'https://test/manifest.m3u8',
@@ -416,7 +406,7 @@ describe('ManifestTextParser', function() {
     });
   });
 
-  describe('parseSegments', function() {
+  describe('parseSegments', () => {
     const manifestText = '#EXTM3U\n' +
         '#EXT-X-TARGETDURATION:6\n' +
         '#EXTINF:5\n' +
@@ -424,7 +414,7 @@ describe('ManifestTextParser', function() {
         '#EXTINF:4\n' +
         'uri2\n';
 
-    it('parses segments', function() {
+    it('parses segments', () => {
       verifyPlaylist(
           {
             type: shaka.hls.PlaylistType.MEDIA,
@@ -433,9 +423,9 @@ describe('ManifestTextParser', function() {
             ],
             segments: [
               new shaka.hls.Segment('https://test/uri',
-                                    [new shaka.hls.Tag(2, 'EXTINF', [], '5')]),
+                  [new shaka.hls.Tag(2, 'EXTINF', [], '5')]),
               new shaka.hls.Segment('https://test/uri2',
-                                    [new shaka.hls.Tag(3, 'EXTINF', [], '4')]),
+                  [new shaka.hls.Tag(3, 'EXTINF', [], '4')]),
             ],
           },
 
@@ -445,7 +435,7 @@ describe('ManifestTextParser', function() {
           'https://test/manifest.m3u8');
     });
 
-    it('identifies playlist tags', function() {
+    it('identifies playlist tags', () => {
       verifyPlaylist(
           {
             type: shaka.hls.PlaylistType.MEDIA,
@@ -455,9 +445,9 @@ describe('ManifestTextParser', function() {
             ],
             segments: [
               new shaka.hls.Segment('https://test/uri',
-                                    [new shaka.hls.Tag(2, 'EXTINF', [], '5')]),
+                  [new shaka.hls.Tag(2, 'EXTINF', [], '5')]),
               new shaka.hls.Segment('https://test/uri2',
-                                    [new shaka.hls.Tag(3, 'EXTINF', [], '4')]),
+                  [new shaka.hls.Tag(3, 'EXTINF', [], '4')]),
             ],
           },
 

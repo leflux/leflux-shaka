@@ -15,7 +15,9 @@
  * limitations under the License.
  */
 
-describe('Mp4SegmentIndexParser', function() {
+describe('Mp4SegmentIndexParser', () => {
+  const Util = shaka.test.Util;
+
   const indexSegmentUri = '/base/test/test/assets/index-segment.mp4';
   const mediaSegmentUri = '/base/test/test/assets/sintel-audio-segment.mp4';
 
@@ -23,7 +25,7 @@ describe('Mp4SegmentIndexParser', function() {
   let mediaSegment;
 
   beforeAll(async () => {
-    let responses = await Promise.all([
+    const responses = await Promise.all([
       shaka.test.Util.fetch(indexSegmentUri),
       shaka.test.Util.fetch(mediaSegmentUri),
     ]);
@@ -31,30 +33,28 @@ describe('Mp4SegmentIndexParser', function() {
     mediaSegment = responses[1];
   });
 
-  it('rejects a non-index segment ', function() {
-    let error = new shaka.util.Error(
+  it('rejects a non-index segment ', () => {
+    const error = Util.jasmineError(new shaka.util.Error(
         shaka.util.Error.Severity.CRITICAL,
         shaka.util.Error.Category.MEDIA,
-        shaka.util.Error.Code.MP4_SIDX_WRONG_BOX_TYPE);
-    try {
-      // eslint-disable-next-line new-cap
-      shaka.media.Mp4SegmentIndexParser(mediaSegment, 0, [], 0);
-      fail('non-index segment is supported');
-    } catch (e) {
-      shaka.test.Util.expectToEqualError(e, error);
-    }
+        shaka.util.Error.Code.MP4_SIDX_WRONG_BOX_TYPE));
+    // eslint-disable-next-line new-cap
+    expect(() =>
+      shaka.media.Mp4SegmentIndexParser.parse(mediaSegment, 0, [], 0))
+        .toThrow(error);
   });
 
-  it('parses index segment ', function() {
+  it('parses index segment ', () => {
     // eslint-disable-next-line new-cap
-    let result = shaka.media.Mp4SegmentIndexParser(indexSegment, 0, [], 0);
-    let references =
+    const result =
+        shaka.media.Mp4SegmentIndexParser.parse(indexSegment, 0, [], 0);
+    const references =
         [
-         {startTime: 0, endTime: 12, startByte: 92, endByte: 194960},
-         {startTime: 12, endTime: 24, startByte: 194961, endByte: 294059},
-         {startTime: 24, endTime: 36, startByte: 294060, endByte: 466352},
-         {startTime: 36, endTime: 48, startByte: 466353, endByte: 615511},
-         {startTime: 48, endTime: 60, startByte: 615512, endByte: 743301},
+          {startTime: 0, endTime: 12, startByte: 92, endByte: 194960},
+          {startTime: 12, endTime: 24, startByte: 194961, endByte: 294059},
+          {startTime: 24, endTime: 36, startByte: 294060, endByte: 466352},
+          {startTime: 36, endTime: 48, startByte: 466353, endByte: 615511},
+          {startTime: 48, endTime: 60, startByte: 615512, endByte: 743301},
         ];
 
     expect(result).toBeTruthy();
@@ -68,16 +68,17 @@ describe('Mp4SegmentIndexParser', function() {
     }
   });
 
-  it('takes a scaled presentationTimeOffset in seconds', function() {
+  it('takes a scaled presentationTimeOffset in seconds', () => {
     // eslint-disable-next-line new-cap
-    let result = shaka.media.Mp4SegmentIndexParser(indexSegment, 0, [], 2);
-    let references =
+    const result =
+        shaka.media.Mp4SegmentIndexParser.parse(indexSegment, 0, [], 2);
+    const references =
         [
-         {startTime: -2, endTime: 10},
-         {startTime: 10, endTime: 22},
-         {startTime: 22, endTime: 34},
-         {startTime: 34, endTime: 46},
-         {startTime: 46, endTime: 58},
+          {startTime: -2, endTime: 10},
+          {startTime: 10, endTime: 22},
+          {startTime: 22, endTime: 34},
+          {startTime: 34, endTime: 46},
+          {startTime: 46, endTime: 58},
         ];
 
     expect(result).toBeTruthy();

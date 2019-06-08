@@ -24,15 +24,34 @@ import check
 import compiler
 import docs
 import gendeps
+import generateLocalizations
 import shakaBuildHelpers
 
 import os
 import re
 
+def compile_less(path_name, main_file_name, parsed_args):
+  match = re.compile(r'.*\.less$')
+  base = shakaBuildHelpers.get_source_base()
+  main_less_src = os.path.join(base, path_name, main_file_name + '.less')
+  all_less_srcs = shakaBuildHelpers.get_all_files(
+      os.path.join(base, path_name), match)
+  output = os.path.join(base, 'dist', main_file_name + '.css')
+
+  less = compiler.Less(main_less_src, all_less_srcs, output)
+  return less.compile(parsed_args.force)
+
 def main(args):
   parser = argparse.ArgumentParser(
       description='User facing build script for building the Shaka'
                   ' Player Project.')
+
+  parser.add_argument(
+      '--locales',
+      type=str,
+      nargs='+',
+      default=generateLocalizations.DEFAULT_LOCALES,
+      help='The list of locales to compile in (default %(default)r)')
 
   parser.add_argument(
       '--fix',
@@ -59,6 +78,20 @@ def main(args):
 
   parsed_args = parser.parse_args(args)
 
+  # Make the dist/ folder, ignore errors.
+  base = shakaBuildHelpers.get_source_base()
+  try:
+    os.mkdir(os.path.join(base, 'dist'))
+  except OSError:
+    pass
+
+  # Generate localizations before running gendeps, so the output is available
+  # to the deps system.
+  # TODO(#1858): It might be time to look at a third-party build system.
+  localizations = compiler.GenerateLocalizations(parsed_args.locales)
+  if not localizations.generate(parsed_args.force):
+    return 1
+
   if gendeps.main([]) != 0:
     return 1
 
@@ -76,18 +109,13 @@ def main(args):
   if docs.main(docs_args) != 0:
     return 1
 
-  match = re.compile(r'.*\.less$')
-  base = shakaBuildHelpers.get_source_base()
-  main_less_src = os.path.join(base, 'ui', 'controls.less')
-  all_less_srcs = shakaBuildHelpers.get_all_files(
-      os.path.join(base, 'ui'), match)
-  output = os.path.join(base, 'dist', 'controls.css')
-
-  less = compiler.Less(main_less_src, all_less_srcs, output)
-  if not less.compile(parsed_args.force):
+  if not compile_less('ui', 'controls', parsed_args):
+    return 1;
+  if not compile_less('demo', 'demo', parsed_args):
     return 1
 
   build_args_with_ui = ['--name', 'ui', '+@complete']
+  build_args_with_ui += ['--locales'] + parsed_args.locales
   build_args_without_ui = ['--name', 'compiled', '+@complete', '-@ui']
 
   if parsed_args.force:

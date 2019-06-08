@@ -15,13 +15,13 @@
  * limitations under the License.
  */
 
-describe('ObjectUtils', function() {
+describe('ObjectUtils', () => {
   const ObjectUtils = shaka.util.ObjectUtils;
 
-  describe('cloneObject', function() {
+  describe('cloneObject', () => {
     const cloneObject = ObjectUtils.cloneObject;
 
-    it('clones values and plain objects', function() {
+    it('clones values and plain objects', () => {
       expect(cloneObject(2)).toBe(2);
       expect(cloneObject('foo')).toBe('foo');
       expect(cloneObject(false)).toBe(false);
@@ -37,8 +37,8 @@ describe('ObjectUtils', function() {
       expect(copy).toEqual(o);
     });
 
-    it('clones nested objects', function() {
-      let o = {
+    it('clones nested objects', () => {
+      const o = {
         foo: 'bar',
         lorem: 'ipsum',
         dolor: {
@@ -59,26 +59,26 @@ describe('ObjectUtils', function() {
           other: 123,
         },
       };
-      let copy = cloneObject(o);
+      const copy = cloneObject(o);
       expect(copy).not.toBe(o);
       expect(copy).toEqual(o);
     });
 
-    it('clones Arrays with non-default length', function() {
-      let a = [1, 2, 3];
+    it('clones Arrays with non-default length', () => {
+      const a = [1, 2, 3];
       a.length = 10;
-      let copy = cloneObject(a);
+      const copy = cloneObject(a);
       expect(copy).toEqual(a);
       expect(copy.length).toEqual(10);
     });
 
-    it('ignores cyclic objects', function() {
-      let o = {foo: 'bar'};
+    it('ignores cyclic objects', () => {
+      const o = {foo: 'bar'};
       o['baz'] = o;
       expect(cloneObject(o)).toEqual({foo: 'bar', baz: null});
     });
 
-    it('ignores non-simple Object objects', function() {
+    it('ignores non-simple Object objects', () => {
       let o = {foo: 1, baz: /foo/g};
       expect(cloneObject(o)).toEqual({foo: 1, baz: null});
 

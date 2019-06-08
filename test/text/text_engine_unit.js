@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-describe('TextEngine', function() {
+describe('TextEngine', () => {
   const TextEngine = shaka.text.TextEngine;
 
   const dummyData = new ArrayBuffer(0);
@@ -36,7 +36,7 @@ describe('TextEngine', function() {
   /** @type {!shaka.text.TextEngine} */
   let textEngine;
 
-  beforeEach(function() {
+  beforeEach(() => {
     mockParseInit = jasmine.createSpy('mockParseInit');
     mockParseMedia = jasmine.createSpy('mockParseMedia');
     mockParserPlugIn = function() {
@@ -54,12 +54,12 @@ describe('TextEngine', function() {
     textEngine.initParser(dummyMimeType);
   });
 
-  afterEach(function() {
+  afterEach(() => {
     TextEngine.unregisterParser(dummyMimeType);
   });
 
-  describe('isTypeSupported', function() {
-    it('reports support only when a parser is installed', function() {
+  describe('isTypeSupported', () => {
+    it('reports support only when a parser is installed', () => {
       TextEngine.unregisterParser(dummyMimeType);
       expect(TextEngine.isTypeSupported(dummyMimeType)).toBe(false);
       TextEngine.registerParser(dummyMimeType, mockParserPlugIn);
@@ -69,38 +69,39 @@ describe('TextEngine', function() {
     });
 
     it('reports support when it\'s closed captions and muxjs is available',
-          function() {
-        const closedCaptionsType =
+        () => {
+          const closedCaptionsType =
            shaka.util.MimeUtils.CLOSED_CAPTION_MIMETYPE;
-        const originalMuxjs = window.muxjs;
-        expect(TextEngine.isTypeSupported(closedCaptionsType)).toBe(true);
-        try {
-          window['muxjs'] = null;
-          expect(TextEngine.isTypeSupported(closedCaptionsType)).toBe(false);
-        } finally {
-          window['muxjs'] = originalMuxjs;
-        }
-    });
+          const originalMuxjs = window.muxjs;
+          expect(TextEngine.isTypeSupported(closedCaptionsType)).toBe(true);
+          try {
+            window['muxjs'] = null;
+            expect(TextEngine.isTypeSupported(closedCaptionsType)).toBe(false);
+          } finally {
+            window['muxjs'] = originalMuxjs;
+          }
+        });
   });
 
-  describe('appendBuffer', function() {
-    it('works asynchronously', function(done) {
+  describe('appendBuffer', () => {
+    it('works asynchronously', async () => {
       mockParseMedia.and.returnValue([1, 2, 3]);
-      textEngine.appendBuffer(dummyData, 0, 3).catch(fail).then(done);
+      const p = textEngine.appendBuffer(dummyData, 0, 3);
       expect(mockDisplayer.appendSpy).not.toHaveBeenCalled();
+      await p;
     });
 
     it('calls displayer.append()', async () => {
-      let cue1 = createFakeCue(1, 2);
-      let cue2 = createFakeCue(2, 3);
-      let cue3 = createFakeCue(3, 4);
-      let cue4 = createFakeCue(4, 5);
+      const cue1 = createFakeCue(1, 2);
+      const cue2 = createFakeCue(2, 3);
+      const cue3 = createFakeCue(3, 4);
+      const cue4 = createFakeCue(4, 5);
       mockParseMedia.and.returnValue([cue1, cue2]);
 
       await textEngine.appendBuffer(dummyData, 0, 3);
       expect(mockParseMedia).toHaveBeenCalledOnceMoreWith([
-          new Uint8Array(dummyData),
-          {periodStart: 0, segmentStart: 0, segmentEnd: 3},
+        new Uint8Array(dummyData),
+        {periodStart: 0, segmentStart: 0, segmentEnd: 3},
       ]);
 
       expect(mockDisplayer.appendSpy).toHaveBeenCalledOnceMoreWith([
@@ -123,15 +124,16 @@ describe('TextEngine', function() {
       ]);
     });
 
-    it('does not throw if called right before destroy', function(done) {
+    it('does not throw if called right before destroy', async () => {
       mockParseMedia.and.returnValue([1, 2, 3]);
-      textEngine.appendBuffer(dummyData, 0, 3).catch(fail).then(done);
+      const p = textEngine.appendBuffer(dummyData, 0, 3);
       textEngine.destroy();
+      await p;
     });
   });
 
-  describe('storeAndAppendClosedCaptions', function() {
-    it('appends closed captions with selected id', function() {
+  describe('storeAndAppendClosedCaptions', () => {
+    it('appends closed captions with selected id', () => {
       const caption = {
         startPts: 0,
         endPts: 100,
@@ -147,7 +149,7 @@ describe('TextEngine', function() {
       expect(mockDisplayer.appendSpy).toHaveBeenCalled();
     });
 
-    it('does not append closed captions without selected id', function() {
+    it('does not append closed captions without selected id', () => {
       const caption = {
         startPts: 0,
         endPts: 100,
@@ -163,7 +165,7 @@ describe('TextEngine', function() {
       expect(mockDisplayer.appendSpy).not.toHaveBeenCalled();
     });
 
-    it('stores closed captions', function() {
+    it('stores closed captions', () => {
       const caption0 = {
         startPts: 0,
         endPts: 100,
@@ -212,7 +214,7 @@ describe('TextEngine', function() {
       expect(textEngine.getNumberOfClosedCaptionChannels()).toEqual(2);
     });
 
-    it('offsets closed captions to account for video offset', function() {
+    it('offsets closed captions to account for video offset', () => {
       const caption = {
         startPts: 0,
         endPts: 100,
@@ -235,46 +237,45 @@ describe('TextEngine', function() {
   });
 
 
-  describe('remove', function() {
+  describe('remove', () => {
     let cue1;
     let cue2;
     let cue3;
 
-    beforeEach(function() {
+    beforeEach(() => {
       cue1 = createFakeCue(0, 1);
       cue2 = createFakeCue(1, 2);
       cue3 = createFakeCue(2, 3);
       mockParseMedia.and.returnValue([cue1, cue2, cue3]);
     });
 
-    it('works asynchronously', function(done) {
-      textEngine.appendBuffer(dummyData, 0, 3).then(function() {
-        let p = textEngine.remove(0, 1);
-        expect(mockDisplayer.removeSpy).not.toHaveBeenCalled();
-        return p;
-      }).catch(fail).then(done);
+    it('works asynchronously', async () => {
+      await textEngine.appendBuffer(dummyData, 0, 3);
+      const p = textEngine.remove(0, 1);
+      expect(mockDisplayer.removeSpy).not.toHaveBeenCalled();
+      await p;
     });
 
-    it('calls displayer.remove()', function(done) {
-      textEngine.remove(0, 1).then(function() {
-        expect(mockDisplayer.removeSpy).toHaveBeenCalledWith(0, 1);
-      }).catch(fail).then(done);
+    it('calls displayer.remove()', async () => {
+      await textEngine.remove(0, 1);
+      expect(mockDisplayer.removeSpy).toHaveBeenCalledWith(0, 1);
     });
 
-    it('does not throw if called right before destroy', function(done) {
-      textEngine.remove(0, 1).catch(fail).then(done);
+    it('does not throw if called right before destroy', async () => {
+      const p = textEngine.remove(0, 1);
       textEngine.destroy();
+      await p;
     });
   });
 
-  describe('setTimestampOffset', function() {
+  describe('setTimestampOffset', () => {
     it('passes the offset to the parser', async () => {
       mockParseMedia.and.callFake((data, time) => {
         return [
           createFakeCue(time.periodStart + 0,
-                        time.periodStart + 1),
+              time.periodStart + 1),
           createFakeCue(time.periodStart + 2,
-                        time.periodStart + 3),
+              time.periodStart + 3),
         ];
       });
 
@@ -307,67 +308,57 @@ describe('TextEngine', function() {
     });
   });
 
-  describe('bufferStart/bufferEnd', function() {
-    beforeEach(function() {
-      mockParseMedia.and.callFake(function() {
+  describe('bufferStart/bufferEnd', () => {
+    beforeEach(() => {
+      mockParseMedia.and.callFake(() => {
         return [createFakeCue(0, 1), createFakeCue(1, 2), createFakeCue(2, 3)];
       });
     });
 
-    it('return null when there are no cues', function() {
+    it('return null when there are no cues', () => {
       expect(textEngine.bufferStart()).toBe(null);
       expect(textEngine.bufferEnd()).toBe(null);
     });
 
-    it('reflect newly-added cues', function(done) {
-      textEngine.appendBuffer(dummyData, 0, 3).then(function() {
-        expect(textEngine.bufferStart()).toBe(0);
-        expect(textEngine.bufferEnd()).toBe(3);
+    it('reflect newly-added cues', async () => {
+      await textEngine.appendBuffer(dummyData, 0, 3);
+      expect(textEngine.bufferStart()).toBe(0);
+      expect(textEngine.bufferEnd()).toBe(3);
 
-        return textEngine.appendBuffer(dummyData, 3, 6);
-      }).then(function() {
-        expect(textEngine.bufferStart()).toBe(0);
-        expect(textEngine.bufferEnd()).toBe(6);
+      await textEngine.appendBuffer(dummyData, 3, 6);
+      expect(textEngine.bufferStart()).toBe(0);
+      expect(textEngine.bufferEnd()).toBe(6);
 
-        return textEngine.appendBuffer(dummyData, 6, 10);
-      }).then(function() {
-        expect(textEngine.bufferStart()).toBe(0);
-        expect(textEngine.bufferEnd()).toBe(10);
-      }).catch(fail).then(done);
+      await textEngine.appendBuffer(dummyData, 6, 10);
+      expect(textEngine.bufferStart()).toBe(0);
+      expect(textEngine.bufferEnd()).toBe(10);
     });
 
-    it('reflect newly-removed cues', function(done) {
-      textEngine.appendBuffer(dummyData, 0, 3).then(function() {
-        return textEngine.appendBuffer(dummyData, 3, 6);
-      }).then(function() {
-        return textEngine.appendBuffer(dummyData, 6, 10);
-      }).then(function() {
-        expect(textEngine.bufferStart()).toBe(0);
-        expect(textEngine.bufferEnd()).toBe(10);
+    it('reflect newly-removed cues', async () => {
+      await textEngine.appendBuffer(dummyData, 0, 3);
+      await textEngine.appendBuffer(dummyData, 3, 6);
+      await textEngine.appendBuffer(dummyData, 6, 10);
+      expect(textEngine.bufferStart()).toBe(0);
+      expect(textEngine.bufferEnd()).toBe(10);
 
-        return textEngine.remove(0, 3);
-      }).then(function() {
-        expect(textEngine.bufferStart()).toBe(3);
-        expect(textEngine.bufferEnd()).toBe(10);
+      await textEngine.remove(0, 3);
+      expect(textEngine.bufferStart()).toBe(3);
+      expect(textEngine.bufferEnd()).toBe(10);
 
-        return textEngine.remove(8, 11);
-      }).then(function() {
-        expect(textEngine.bufferStart()).toBe(3);
-        expect(textEngine.bufferEnd()).toBe(8);
+      await textEngine.remove(8, 11);
+      expect(textEngine.bufferStart()).toBe(3);
+      expect(textEngine.bufferEnd()).toBe(8);
 
-        return textEngine.remove(11, 20);
-      }).then(function() {
-        expect(textEngine.bufferStart()).toBe(3);
-        expect(textEngine.bufferEnd()).toBe(8);
+      await textEngine.remove(11, 20);
+      expect(textEngine.bufferStart()).toBe(3);
+      expect(textEngine.bufferEnd()).toBe(8);
 
-        return textEngine.remove(0, Infinity);
-      }).then(function() {
-        expect(textEngine.bufferStart()).toBe(null);
-        expect(textEngine.bufferEnd()).toBe(null);
-      }).catch(fail).then(done);
+      await textEngine.remove(0, Infinity);
+      expect(textEngine.bufferStart()).toBe(null);
+      expect(textEngine.bufferEnd()).toBe(null);
     });
 
-    it('does not use timestamp offset', async function() {
+    it('does not use timestamp offset', async () => {
       // The start and end times passed to appendBuffer are now absolute, so
       // they already account for timestampOffset and period offset.
       // See https://github.com/google/shaka-player/issues/1562
@@ -382,38 +373,35 @@ describe('TextEngine', function() {
     });
   });
 
-  describe('bufferedAheadOf', function() {
-    beforeEach(function() {
-      mockParseMedia.and.callFake(function() {
+  describe('bufferedAheadOf', () => {
+    beforeEach(() => {
+      mockParseMedia.and.callFake(() => {
         return [createFakeCue(0, 1), createFakeCue(1, 2), createFakeCue(2, 3)];
       });
     });
 
-    it('returns 0 when there are no cues', function() {
+    it('returns 0 when there are no cues', () => {
       expect(textEngine.bufferedAheadOf(0)).toBe(0);
     });
 
-    it('returns 0 if |t| is not buffered', function(done) {
-      textEngine.appendBuffer(dummyData, 3, 6).then(function() {
-        expect(textEngine.bufferedAheadOf(6.1)).toBe(0);
-      }).catch(fail).then(done);
+    it('returns 0 if |t| is not buffered', async () => {
+      await textEngine.appendBuffer(dummyData, 3, 6);
+      expect(textEngine.bufferedAheadOf(6.1)).toBe(0);
     });
 
-    it('ignores gaps in the content', function(done) {
-      textEngine.appendBuffer(dummyData, 3, 6).then(function() {
-        expect(textEngine.bufferedAheadOf(2)).toBe(3);
-      }).catch(fail).then(done);
+    it('ignores gaps in the content', async () => {
+      await textEngine.appendBuffer(dummyData, 3, 6);
+      expect(textEngine.bufferedAheadOf(2)).toBe(3);
     });
 
-    it('returns the distance to the end if |t| is buffered', function(done) {
-      textEngine.appendBuffer(dummyData, 0, 3).then(function() {
-        expect(textEngine.bufferedAheadOf(0)).toBe(3);
-        expect(textEngine.bufferedAheadOf(1)).toBe(2);
-        expect(textEngine.bufferedAheadOf(2.5)).toBeCloseTo(0.5);
-      }).catch(fail).then(done);
+    it('returns the distance to the end if |t| is buffered', async () => {
+      await textEngine.appendBuffer(dummyData, 0, 3);
+      expect(textEngine.bufferedAheadOf(0)).toBe(3);
+      expect(textEngine.bufferedAheadOf(1)).toBe(2);
+      expect(textEngine.bufferedAheadOf(2.5)).toBeCloseTo(0.5);
     });
 
-    it('does not use timestamp offset', async function() {
+    it('does not use timestamp offset', async () => {
       // The start and end times passed to appendBuffer are now absolute, so
       // they already account for timestampOffset and period offset.
       // See https://github.com/google/shaka-player/issues/1562
@@ -424,9 +412,9 @@ describe('TextEngine', function() {
     });
   });
 
-  describe('setAppendWindow', function() {
-    beforeEach(function() {
-      mockParseMedia.and.callFake(function() {
+  describe('setAppendWindow', () => {
+    beforeEach(() => {
+      mockParseMedia.and.callFake(() => {
         return [createFakeCue(0, 1), createFakeCue(1, 2), createFakeCue(2, 3)];
       });
     });
@@ -453,35 +441,29 @@ describe('TextEngine', function() {
       ]);
     });
 
-    it('limits bufferStart', function(done) {
+    it('limits bufferStart', async () => {
       textEngine.setAppendWindow(1, 9);
-      textEngine.appendBuffer(dummyData, 0, 3).then(function() {
-        expect(textEngine.bufferStart()).toBe(1);
+      await textEngine.appendBuffer(dummyData, 0, 3);
+      expect(textEngine.bufferStart()).toBe(1);
 
-        return textEngine.remove(0, 9);
-      }).then(function() {
-        textEngine.setAppendWindow(2.1, 9);
-        return textEngine.appendBuffer(dummyData, 0, 3);
-      }).then(function() {
-        expect(textEngine.bufferStart()).toBe(2.1);
-      }).catch(fail).then(done);
+      await textEngine.remove(0, 9);
+      textEngine.setAppendWindow(2.1, 9);
+      await textEngine.appendBuffer(dummyData, 0, 3);
+      expect(textEngine.bufferStart()).toBe(2.1);
     });
 
-    it('limits bufferEnd', function(done) {
+    it('limits bufferEnd', async () => {
       textEngine.setAppendWindow(0, 1.9);
-      textEngine.appendBuffer(dummyData, 0, 3).then(function() {
-        expect(textEngine.bufferEnd()).toBe(1.9);
+      await textEngine.appendBuffer(dummyData, 0, 3);
+      expect(textEngine.bufferEnd()).toBe(1.9);
 
-        textEngine.setAppendWindow(0, 2.1);
-        return textEngine.appendBuffer(dummyData, 0, 3);
-      }).then(function() {
-        expect(textEngine.bufferEnd()).toBe(2.1);
+      textEngine.setAppendWindow(0, 2.1);
+      await textEngine.appendBuffer(dummyData, 0, 3);
+      expect(textEngine.bufferEnd()).toBe(2.1);
 
-        textEngine.setAppendWindow(0, 4.1);
-        return textEngine.appendBuffer(dummyData, 0, 3);
-      }).then(function() {
-        expect(textEngine.bufferEnd()).toBe(3);
-      }).catch(fail).then(done);
+      textEngine.setAppendWindow(0, 4.1);
+      await textEngine.appendBuffer(dummyData, 0, 3);
+      expect(textEngine.bufferEnd()).toBe(3);
     });
   });
 

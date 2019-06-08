@@ -66,10 +66,24 @@ jasmine.Matchers = function() {};
 
 
 /**
+ * @constructor
+ * @struct
+ */
+jasmine.MatchersAsync = function() {};
+
+
+/**
  * @param {*} value
  * @return {!jasmine.Matchers}
  */
 var expect = function(value) {};
+
+
+/**
+ * @param {!Promise} value
+ * @return {!jasmine.MatchersAsync}
+ */
+var expectAsync = function(value) {};
 
 
 /** @param {string=} message */
@@ -80,8 +94,11 @@ var pending = function(message) {};
 jasmine.Matchers.prototype.not;
 
 
-/** @param {*} value */
-jasmine.Matchers.prototype.toBe = function(value) {};
+/**
+ * @param {*} value
+ * @param {string=} message
+ */
+jasmine.Matchers.prototype.toBe = function(value, message) {};
 
 
 /**
@@ -169,6 +186,34 @@ jasmine.Matchers.prototype.toHaveBeenCalledOnceMore = function() {};
  * @param {!Array.<*>} args
  */
 jasmine.Matchers.prototype.toHaveBeenCalledOnceMoreWith = function(args) {};
+
+
+/** @type {!jasmine.MatchersAsync} */
+jasmine.MatchersAsync.prototype.not;
+
+/** @return {!Promise} */
+jasmine.MatchersAsync.prototype.toBeRejected = function() {};
+
+/**
+ * @param {*} expected
+ * @return {!Promise}
+ */
+jasmine.MatchersAsync.prototype.toBeRejectedWith = function(expected) {};
+
+/** @return {!Promise} */
+jasmine.MatchersAsync.prototype.toBeResolved = function() {};
+
+/**
+ * @param {*} expected
+ * @return {!Promise}
+ */
+jasmine.MatchersAsync.prototype.toBeResolvedTo = function(expected) {};
+
+/**
+ * @param {string} message
+ * @return {!jasmine.MatchersAsync}
+ */
+jasmine.MatchersAsync.prototype.withContext = function(message) {};
 
 
 /**

@@ -25,13 +25,6 @@
  * @param {string} name
  * @param {jasmine.Callback} callback
  */
-var externalIt = function(name, callback) {};
-
-
-/**
- * @param {string} name
- * @param {jasmine.Callback} callback
- */
 var drmIt = function(name, callback) {};
 
 
@@ -40,3 +33,11 @@ var drmIt = function(name, callback) {};
  * @param {jasmine.Callback} callback
  */
 var quarantinedIt = function(name, callback) {};
+
+
+/**
+ * @param {string} name
+ * @param {function():*} cond
+ * @param {function()} callback
+ */
+var filterDescribe = function(name, cond, callback) {};

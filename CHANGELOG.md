@@ -1,3 +1,155 @@
+## 2.5.1 (2019-05-20)
+
+New Features:
+  - Inline external CSS for quicker load
+    - You no longer need to include Material Design Icons font in your app
+  - Use clean-css plugin in less.js to minify CSS
+
+Bugfixes:
+  - Deprecate ui.getPlayer for controls.getPlayer
+    - https://github.com/google/shaka-player/issues/1941
+  - Fix switching text displayer mid-playback
+  - Improve french translations
+    - https://github.com/google/shaka-player/pull/1944
+  - Improve logic for aborting network requests
+  - Fix initial bandwidth estimate on Chrome
+  - Upgrade mux.js and use minified version
+  - Fix exception on network retry
+    - https://github.com/google/shaka-player/issues/1930
+  - Fix API-based UI setup with default config
+  - Allow two-argument configure() calls for UI and offline
+  - Add missing export on ui.Overlay.getConfiguration
+  - Various improvements in test reliability
+  - Various fixes for compatibility with newer compiler versions
+
+Demo App:
+  - Fix asset card highlight on reload
+  - Fix reconnection to cast sessions on reload
+    - https://github.com/google/shaka-player/issues/1948
+  - Fix handling of error events
+  - Fix centering of asset card titles
+  - Move download button to the corner of asset cards
+  - Add WebP variants for asset icons to reduce size by 88%
+  - Optimize app load time by pre-connecting to external origins
+  - Defer creating tab contents until shown
+  - Make name field in custom assets more permissive
+  - Add link to support page in footer
+  - Allow demo to load custom assets from hash
+  - Do not disable controls on startup
+  - Added missing config values
+  - Catch certificate errors in demo
+    - https://github.com/google/shaka-player/issues/1914
+  - Let demo load even if storage fails to load
+    - https://github.com/google/shaka-player/issues/1925
+  - Re-load current asset if page reloads
+  - Fix unsupported button tooltips
+
+
+## 2.5.0 (2019-05-08)
+
+**The UI is now out of beta!  Use shaka-player.ui.js and see the UI tutorials.**
+
+Core Bugfixes:
+  - Fix missing variants in HLS
+    - https://github.com/google/shaka-player/issues/1908
+  - Ignore manifest-provided license servers if application-provided servers
+    are configured
+    - https://github.com/google/shaka-player/issues/1905
+  - Fix range header regression that broke IIS compatibility
+  - Fix initial display of captions based on language preferences
+    - https://github.com/google/shaka-player/issues/1879
+  - Ignore duplicate codecs in HLS
+    - https://github.com/google/shaka-player/issues/1817
+  - Reject AES-128 HLS content with meaningful error
+    - https://github.com/google/shaka-player/issues/1838
+  - Fix React Native createObjectURL polyfill incompatibility
+    - https://github.com/google/shaka-player/issues/1842
+    - https://github.com/google/shaka-player/pull/1845
+  - Dolby Vision fixes for Chromecast
+    - https://github.com/google/shaka-player/pull/1844
+  - Fix redundant initialization of MediaSource
+    - https://github.com/google/shaka-player/issues/1570
+  - Fix stalls on WebOS
+    - https://github.com/google/shaka-player/issues/1704
+    - https://github.com/google/shaka-player/pull/1820
+  - Fix missing require for SimpleTextDisplayer
+    - https://github.com/google/shaka-player/issues/1819
+  - Fix broken version definition in compiled build
+    - https://github.com/google/shaka-player/issues/1816
+  - Fix video reloading on audio language change
+    - https://github.com/google/shaka-player/issues/1714
+
+UI Bugfixes:
+  - Fix missing resolution menu in UI after playing audio-only content
+  - Fix pointer cursor on UI spacer
+  - Do not show PIP button if not allowed
+  - Fix hiding captions in UI text displayer
+    - https://github.com/google/shaka-player/issues/1893
+  - Fix UI text displayer positioning on IE
+  - Make live stream timecode accessible to screen readers in the UI
+    - https://github.com/google/shaka-player/issues/1861
+  - Fix ARIA pressed state for button in text selection menu
+  - Show picture-in-picture btn only when the content has video
+    - https://github.com/google/shaka-player/issues/1849
+  - Fix multiline captions in UI text displayer
+  - Fix display of cast button in UI
+    - https://github.com/google/shaka-player/issues/1803
+  - Fix conflict between PiP and fullscreen
+  - Fix cast receiver styling
+
+New Core Features:
+  - Abort requests when network downgrading
+    - https://github.com/google/shaka-player/issues/1051
+  - Add FairPlay support
+    - https://github.com/google/shaka-player/issues/382
+  - Add native HLS support on iOS and Safari
+    - https://github.com/google/shaka-player/issues/997
+  - Support src= for single-file playback
+    - https://github.com/google/shaka-player/issues/816
+    - https://github.com/google/shaka-player/pull/1888
+    - https://github.com/google/shaka-player/pull/1898
+  - Add 'manifestparsed' event for early access to manifest contents
+  - Add 'abrstatuschanged' event to help manage UI state
+  - Make manifest redirections sticky for updates
+    - https://github.com/google/shaka-player/issues/1367
+    - https://github.com/google/shaka-player/pull/1880
+  - Track time in "pause" state in stats
+    - https://github.com/google/shaka-player/pull/1855
+  - Make Stall Detector Configurable
+    - https://github.com/google/shaka-player/issues/1839
+
+New UI Features:
+  - Add support for UI reconfiguration and layout changes
+    - https://github.com/google/shaka-player/issues/1674
+  - Add support for custom UI buttons
+    - https://github.com/google/shaka-player/issues/1673
+  - Add partial support for SMPTE-TT subtitles in UI text displayer
+    - https://github.com/google/shaka-player/issues/840
+    - https://github.com/google/shaka-player/pull/1859
+  - Add PiP support in Safari
+    - https://github.com/google/shaka-player/pull/1902
+
+
+Demo App:
+  - Complete redesign of the demo app!
+  - Load non-built-in localizations from the server at runtime
+    - https://github.com/google/shaka-player/issues/1688
+  - Ignore spurious errors from ChromeVox
+    - https://github.com/google/shaka-player/issues/1862
+  - Don't handle non-app resources in service worker
+    - https://github.com/google/shaka-player/issues/1256
+    - https://github.com/google/shaka-player/issues/1392
+
+Docs:
+  - Document UI events
+    - https://github.com/google/shaka-player/issues/1870
+  - Update Manifest Parser documentation
+  - Clarify track selection callback in offline tutorial
+  - Fix jsdoc and markdown formatting of links
+  - Add link for Shaka Player Embedded
+    - https://github.com/google/shaka-player/issues/1846
+
+
 ## 2.5.0-beta3 (2019-02-20)
 
 New Features:

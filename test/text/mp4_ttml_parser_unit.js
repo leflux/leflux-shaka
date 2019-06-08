@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-describe('Mp4TtmlParser', function() {
+describe('Mp4TtmlParser', () => {
   const ttmlInitSegmentUri = '/base/test/test/assets/ttml-init.mp4';
   const ttmlSegmentUri = '/base/test/test/assets/ttml-segment.mp4';
   const ttmlSegmentMultipleMDATUri =
@@ -31,68 +31,63 @@ describe('Mp4TtmlParser', function() {
   /** @type {!Uint8Array} */
   let audioInitSegment;
 
-  beforeAll(function(done) {
-    Promise.all([
+  beforeAll(async () => {
+    const responses = await Promise.all([
       shaka.test.Util.fetch(ttmlInitSegmentUri),
       shaka.test.Util.fetch(ttmlSegmentUri),
       shaka.test.Util.fetch(ttmlSegmentMultipleMDATUri),
       shaka.test.Util.fetch(audioInitSegmentUri),
-    ]).then(function(responses) {
-      ttmlInitSegment = new Uint8Array(responses[0]);
-      ttmlSegment = new Uint8Array(responses[1]);
-      ttmlSegmentMultipleMDAT = new Uint8Array(responses[2]);
-      audioInitSegment = new Uint8Array(responses[3]);
-    }).catch(fail).then(done);
+    ]);
+    ttmlInitSegment = new Uint8Array(responses[0]);
+    ttmlSegment = new Uint8Array(responses[1]);
+    ttmlSegmentMultipleMDAT = new Uint8Array(responses[2]);
+    audioInitSegment = new Uint8Array(responses[3]);
   });
 
-  it('parses init segment', function() {
+  it('parses init segment', () => {
     new shaka.text.Mp4TtmlParser().parseInit(ttmlInitSegment);
   });
 
-  it('parses media segment', function() {
-    let parser = new shaka.text.Mp4TtmlParser();
+  it('parses media segment', () => {
+    const parser = new shaka.text.Mp4TtmlParser();
     parser.parseInit(ttmlInitSegment);
-    let time = {periodStart: 0, segmentStart: 0, segmentEnd: 0};
-    let ret = parser.parseMedia(ttmlSegment, time);
+    const time = {periodStart: 0, segmentStart: 0, segmentEnd: 0};
+    const ret = parser.parseMedia(ttmlSegment, time);
     expect(ret.length).toBe(10);
   });
 
-  it('handles media segments with multiple mdats', function() {
-    let parser = new shaka.text.Mp4TtmlParser();
+  it('handles media segments with multiple mdats', () => {
+    const parser = new shaka.text.Mp4TtmlParser();
     parser.parseInit(ttmlInitSegment);
-    let time = {periodStart: 0, segmentStart: 0, segmentEnd: 0};
-    let ret = parser.parseMedia(ttmlSegmentMultipleMDAT, time);
+    const time = {periodStart: 0, segmentStart: 0, segmentEnd: 0};
+    const ret = parser.parseMedia(ttmlSegmentMultipleMDAT, time);
     expect(ret.length).toBe(20);
   });
 
-  it('accounts for offset', function() {
-    let time1 = {periodStart: 0, segmentStart: 0, segmentEnd: 0};
-    let time2 = {periodStart: 7, segmentStart: 0, segmentEnd: 0};
+  it('accounts for offset', () => {
+    const time1 = {periodStart: 0, segmentStart: 0, segmentEnd: 0};
+    const time2 = {periodStart: 7, segmentStart: 0, segmentEnd: 0};
 
-    let parser = new shaka.text.Mp4TtmlParser();
+    const parser = new shaka.text.Mp4TtmlParser();
     parser.parseInit(ttmlInitSegment);
 
-    let ret1 = parser.parseMedia(ttmlSegment, time1);
+    const ret1 = parser.parseMedia(ttmlSegment, time1);
     expect(ret1.length).toBeGreaterThan(0);
 
-    let ret2 = parser.parseMedia(ttmlSegment, time2);
+    const ret2 = parser.parseMedia(ttmlSegment, time2);
     expect(ret2.length).toBeGreaterThan(0);
 
     expect(ret2[0].startTime).toEqual(ret1[0].startTime + 7);
     expect(ret2[0].endTime).toEqual(ret1[0].endTime + 7);
   });
 
-  it('rejects init segment with no ttml', function() {
-    let error = new shaka.util.Error(
+  it('rejects init segment with no ttml', () => {
+    const error = shaka.test.Util.jasmineError(new shaka.util.Error(
         shaka.util.Error.Severity.CRITICAL,
         shaka.util.Error.Category.TEXT,
-        shaka.util.Error.Code.INVALID_MP4_TTML);
+        shaka.util.Error.Code.INVALID_MP4_TTML));
 
-    try {
-      new shaka.text.Mp4TtmlParser().parseInit(audioInitSegment);
-      fail('Mp4 file with no ttml supported');
-    } catch (e) {
-      shaka.test.Util.expectToEqualError(e, error);
-    }
+    expect(() => new shaka.text.Mp4TtmlParser().parseInit(audioInitSegment))
+        .toThrow(error);
   });
 });

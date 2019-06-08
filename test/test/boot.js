@@ -32,8 +32,8 @@ function getClientArg(name) {
 
 // Executed before test utilities and tests are loaded, but after Shaka Player
 // is loaded in uncompiled mode.
-(function() {
-  let realAssert = console.assert.bind(console);
+(() => {
+  const realAssert = console.assert.bind(console);
 
   /**
    * A version of assert() which hooks into jasmine and converts all failed
@@ -72,7 +72,7 @@ function getClientArg(name) {
   });
 
   // Use a RegExp if --specFilter is set, else empty string will match all.
-  let specFilterRegExp = new RegExp(getClientArg('specFilter') || '');
+  const specFilterRegExp = new RegExp(getClientArg('specFilter') || '');
 
   /**
    * A filter over all Jasmine specs.
@@ -100,12 +100,12 @@ function getClientArg(name) {
   // seems to be OK.  I suspect Edge's Promise implementation is actually not in
   // native code, but rather something like a polyfill that binds to timer calls
   // the first time it needs to schedule something.
-  Promise.resolve().then(function() {});
+  Promise.resolve().then(() => {});
 
   // Set the default timeout to 120s for all asynchronous tests.
   jasmine.DEFAULT_TIMEOUT_INTERVAL = 120 * 1000;
 
-  let logLevel = getClientArg('logLevel');
+  const logLevel = getClientArg('logLevel');
   if (logLevel) {
     shaka.log.setLevel(Number(logLevel));
   } else {
@@ -116,7 +116,7 @@ function getClientArg(name) {
   if (getClientArg('random')) {
     jasmine.getEnv().randomizeTests(true);
 
-    let seed = getClientArg('seed');
+    const seed = getClientArg('seed');
     if (seed) {
       jasmine.getEnv().seed(seed.toString());
     }
@@ -124,18 +124,22 @@ function getClientArg(name) {
 
   /**
    * Returns a Jasmine callback which shims the real callback and checks for
-   * a certain client arg.  The test will only be run if that argument is
-   * specified on the command-line.
+   * a certain condition.  The test will only be run if the condition is true.
    *
    * @param {jasmine.Callback} callback  The test callback.
-   * @param {string} clientArg  The command-line arg that must be present.
-   * @param {string} skipMessage  The message used when skipping a test.
+   * @param {function():*} cond
+   * @param {?string} skipMessage  The message used when skipping a test; or
+   *   null to not use pending().  This should only be null for before/after
+   *   blocks.
    * @return {jasmine.Callback}
    */
-  function filterShim(callback, clientArg, skipMessage) {
-    return async function() {
-      if (!getClientArg(clientArg)) {
-        pending(skipMessage);
+  function filterShim(callback, cond, skipMessage) {
+    return async () => {
+      const val = await cond();
+      if (!val) {
+        if (skipMessage) {
+          pending(skipMessage);
+        }
         return;
       }
 
@@ -156,9 +160,11 @@ function getClientArg(name) {
    * @param {string} name
    * @param {jasmine.Callback} callback
    */
-  window.drmIt = function(name, callback) {
-    it(name, filterShim(callback, 'drm',
-        'Skipping tests that use a DRM license server.'));
+  window.drmIt = (name, callback) => {
+    const shim = filterShim(
+        callback, () => getClientArg('drm'),
+        'Skipping tests that use a DRM license server.');
+    it(name, shim);
   };
 
   /**
@@ -167,9 +173,48 @@ function getClientArg(name) {
    * @param {string} name
    * @param {jasmine.Callback} callback
    */
-  window.quarantinedIt = function(name, callback) {
-    it(name, filterShim(callback, 'quarantined',
-        'Skipping tests that are quarantined.'));
+  window.quarantinedIt = (name, callback) => {
+    const shim = filterShim(
+        callback, () => getClientArg('quarantined'),
+        'Skipping tests that are quarantined.');
+    it(name, shim);
+  };
+
+  /**
+   * Run contained tests when the condition is true.
+   *
+   * @param {string} describeName  The name of the describe() block.
+   * @param {function():*} cond A function for the condition; if this returns
+   *   a truthy value, the tests will run, falsy will skip the tests.
+   * @param {function()} describeBody The body of the describe() block.  This
+   *   function will call before/after/it functions to define tests.
+   */
+  window.filterDescribe = (describeName, cond, describeBody) => {
+    describe(describeName, () => {
+      const old = {};
+      for (const methodName of ['fit', 'it']) {
+        old[methodName] = window[methodName];
+        window[methodName] = (testName, testBody, ...rest) => {
+          const shim = filterShim(
+              testBody, cond, 'Skipping test due to platform support');
+          return old[methodName](testName, shim, ...rest);
+        };
+      }
+      const otherNames = ['afterAll', 'afterEach', 'beforeAll', 'beforeEach'];
+      for (const methodName of otherNames) {
+        old[methodName] = window[methodName];
+        window[methodName] = (body, ...rest) => {
+          const shim = filterShim(body, cond, null);
+          return old[methodName](shim, ...rest);
+        };
+      }
+
+      describeBody();
+
+      for (const methodName in old) {
+        window[methodName] = old[methodName];
+      }
+    });
   };
 
   beforeAll((done) => {
@@ -199,27 +244,49 @@ function getClientArg(name) {
     // Load required AMD modules, then proceed with tests.
     require(['promise-mock', 'sprintf-js', 'less'],
         (PromiseMock, sprintfJs, less) => {
-      window.PromiseMock = PromiseMock;
-      window.sprintf = sprintfJs.sprintf;
-      window.less = less;
+          // These external interfaces are declared as "const" in the externs.
+          // Avoid "const"-ness complaints from the compiler by assigning these
+          // using bracket notation.
+          window['PromiseMock'] = PromiseMock;
+          window['sprintf'] = sprintfJs.sprintf;
+          window['less'] = less;
 
-      // Patch a new convenience method into PromiseMock.
-      // See https://github.com/taylorhakes/promise-mock/issues/7
-      PromiseMock.flush = () => {
-        // Pass strict == false so it does not throw.
-        PromiseMock.runAll(false /* strict */);
-      };
+          // Patch a new convenience method into PromiseMock.
+          // See https://github.com/taylorhakes/promise-mock/issues/7
+          PromiseMock.flush = () => {
+            // Pass strict == false so it does not throw.
+            PromiseMock.runAll(false /* strict */);
+          };
 
-      done();
-    });
+          done();
+        });
   });
 
+  const originalSetTimeout = window.setTimeout;
   const delayTests = getClientArg('delayTests');
   if (delayTests) {
-    const originalSetTimeout = window.setTimeout;
     afterEach((done) => {
-      console.log('DELAYING...');
+      console.log('Delaying test by ' + delayTests + ' seconds...');
       originalSetTimeout(done, delayTests * 1000);
     });
   }
+
+  // Work-around: allow the Tizen media pipeline to cool down.
+  // Without this, Tizen's pipeline seems to hang in subsequent tests.
+  // TODO: file a bug on Tizen
+  if (shaka.util.Platform.isTizen()) {
+    afterEach((done) => {
+      originalSetTimeout(done, 100 /* ms */);
+    });
+  }
+
+  // Code in karma-jasmine's adapter will malform test failures when the
+  // expectation message contains a stack trace, losing the failure message and
+  // mixing up the stack trace of the failure.  To avoid this, we modify
+  // shaka.util.Error not to create a stack trace.  This trace is not available
+  // in production, and there is never any need for it in the tests.
+  // Shimming shaka.util.Error proved too complicated because of a combination
+  // of compiler restrictions and ES6 language features, so this is by far the
+  // simpler answer.
+  shaka.util.Error.createStack = false;
 })();

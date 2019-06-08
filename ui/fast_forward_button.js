@@ -21,7 +21,7 @@ goog.provide('shaka.ui.FastForwardButton');
 goog.require('shaka.ui.Element');
 goog.require('shaka.ui.Locales');
 goog.require('shaka.ui.Localization');
-goog.require('shaka.ui.Utils');
+goog.require('shaka.util.Dom');
 
 
 /**
@@ -37,7 +37,7 @@ shaka.ui.FastForwardButton = class extends shaka.ui.Element {
   constructor(parent, controls) {
     super(parent, controls);
 
-    this.button_ = shaka.ui.Utils.createHTMLElement('button');
+    this.button_ = shaka.util.Dom.createHTMLElement('button');
     this.button_.classList.add('material-icons');
     this.button_.classList.add('shaka-fast-forward-button');
     this.button_.textContent =
@@ -46,14 +46,14 @@ shaka.ui.FastForwardButton = class extends shaka.ui.Element {
     this.updateAriaLabel_();
 
     this.eventManager.listen(
-      this.localization, shaka.ui.Localization.LOCALE_UPDATED, () => {
-        this.updateAriaLabel_();
-    });
+        this.localization, shaka.ui.Localization.LOCALE_UPDATED, () => {
+          this.updateAriaLabel_();
+        });
 
     this.eventManager.listen(
-      this.localization, shaka.ui.Localization.LOCALE_CHANGED, () => {
-        this.updateAriaLabel_();
-    });
+        this.localization, shaka.ui.Localization.LOCALE_CHANGED, () => {
+          this.updateAriaLabel_();
+        });
 
     this.eventManager.listen(this.button_, 'click', () => {
       this.fastForward_();
@@ -65,8 +65,7 @@ shaka.ui.FastForwardButton = class extends shaka.ui.Element {
    */
   updateAriaLabel_() {
     this.button_.setAttribute(shaka.ui.Constants.ARIA_LABEL,
-        this.localization.resolve(
-          shaka.ui.Locales.Ids.ARIA_LABEL_FAST_FORWARD));
+        this.localization.resolve(shaka.ui.Locales.Ids.FAST_FORWARD));
   }
 
   /**
@@ -100,4 +99,4 @@ shaka.ui.FastForwardButton.Factory = class {
 };
 
 shaka.ui.Controls.registerElement(
-  'fast_forward', new shaka.ui.FastForwardButton.Factory());
+    'fast_forward', new shaka.ui.FastForwardButton.Factory());

@@ -19,6 +19,7 @@
 goog.provide('shaka.ui.PresentationTimeTracker');
 
 goog.require('shaka.ui.Element');
+goog.require('shaka.util.Dom');
 
 
 /**
@@ -34,7 +35,7 @@ shaka.ui.PresentationTimeTracker = class extends shaka.ui.Element {
   constructor(parent, controls) {
     super(parent, controls);
 
-    this.currentTime_ = shaka.ui.Utils.createHTMLElement('div');
+    this.currentTime_ = shaka.util.Dom.createHTMLElement('button');
     this.currentTime_.classList.add('shaka-current-time');
     this.currentTime_.textContent = '0:00';
     this.parent.appendChild(this.currentTime_);
@@ -49,6 +50,10 @@ shaka.ui.PresentationTimeTracker = class extends shaka.ui.Element {
     this.eventManager.listen(this.controls, 'timeandseekrangeupdated', () => {
       this.updateTime_();
     });
+
+    this.eventManager.listen(this.player, 'trackschanged', () => {
+      this.onTracksChanged_();
+    });
   }
 
 
@@ -58,33 +63,33 @@ shaka.ui.PresentationTimeTracker = class extends shaka.ui.Element {
   updateTime_() {
     const isSeeking = this.controls.isSeeking();
     let displayTime = this.controls.getDisplayTime();
-    let duration = this.video.duration;
-    let seekRange = this.player.seekRange();
-    let seekRangeSize = seekRange.end - seekRange.start;
+    const duration = this.video.duration;
+    const seekRange = this.player.seekRange();
+    const seekRangeSize = seekRange.end - seekRange.start;
 
     if (this.player.isLive()) {
       // The amount of time we are behind the live edge.
-      let behindLive = Math.floor(seekRange.end - displayTime);
+      const behindLive = Math.floor(seekRange.end - displayTime);
       displayTime = Math.max(0, behindLive);
 
-      let showHour = seekRangeSize >= 3600;
+      const showHour = seekRangeSize >= 3600;
 
       // Consider "LIVE" when less than 1 second behind the live-edge.  Always
       // show the full time string when seeking, including the leading '-';
       // otherwise, the time string "flickers" near the live-edge.
+      // The button should only be clickable when it's live stream content, and
+      // the current play time is behind live edge.
       if ((displayTime >= 1) || isSeeking) {
         this.currentTime_.textContent =
             '- ' + this.buildTimeString_(displayTime, showHour);
-        // TODO: move to CSS
-        this.currentTime_.style.cursor = 'pointer';
+        this.currentTime_.disabled = false;
       } else {
         this.currentTime_.textContent =
-          this.localization.resolve(shaka.ui.Locales.Ids.LABEL_LIVE);
-        // TODO: move to CSS
-        this.currentTime_.style.cursor = '';
+            this.localization.resolve(shaka.ui.Locales.Ids.LIVE);
+        this.currentTime_.disabled = true;
       }
     } else {
-      let showHour = duration >= 3600;
+      const showHour = duration >= 3600;
 
       this.currentTime_.textContent =
           this.buildTimeString_(displayTime, showHour);
@@ -93,8 +98,7 @@ shaka.ui.PresentationTimeTracker = class extends shaka.ui.Element {
         this.currentTime_.textContent += ' / ' +
             this.buildTimeString_(duration, showHour);
       }
-      // TODO: move to CSS
-      this.currentTime_.style.cursor = '';
+      this.currentTime_.disabled = true;
     }
   }
 
@@ -108,16 +112,31 @@ shaka.ui.PresentationTimeTracker = class extends shaka.ui.Element {
    * @private
    */
   buildTimeString_(displayTime, showHour) {
-    let h = Math.floor(displayTime / 3600);
-    let m = Math.floor((displayTime / 60) % 60);
+    const h = Math.floor(displayTime / 3600);
+    const m = Math.floor((displayTime / 60) % 60);
     let s = Math.floor(displayTime % 60);
-    if (s < 10) s = '0' + s;
+    if (s < 10) {
+      s = '0' + s;
+    }
     let text = m + ':' + s;
     if (showHour) {
-      if (m < 10) text = '0' + text;
+      if (m < 10) {
+        text = '0' + text;
+      }
       text = h + ':' + text;
     }
     return text;
+  }
+
+  /**
+   * Set the aria label to be 'Live' when the content is live stream.
+   */
+  onTracksChanged_() {
+    if (this.player.isLive()) {
+      const ariaLabel = shaka.ui.Locales.Ids.SKIP_TO_LIVE;
+      this.currentTime_.setAttribute(shaka.ui.Constants.ARIA_LABEL,
+          this.localization.resolve(ariaLabel));
+    }
   }
 };
 
@@ -134,4 +153,4 @@ shaka.ui.PresentationTimeTracker.Factory = class {
 };
 
 shaka.ui.Controls.registerElement(
-  'time_and_duration', new shaka.ui.PresentationTimeTracker.Factory());
+    'time_and_duration', new shaka.ui.PresentationTimeTracker.Factory());

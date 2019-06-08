@@ -64,10 +64,7 @@ describe('StreamingEngine', () => {
   let onStartupComplete;
 
   beforeAll(() => {
-    video = /** @type {!HTMLVideoElement} */ (document.createElement('video'));
-    video.width = 600;
-    video.height = 400;
-    video.muted = true;
+    video = shaka.util.Dom.createVideoElement();
     document.body.appendChild(video);
 
     metadata = shaka.test.TestScheme.DATA['sintel'];
@@ -99,11 +96,6 @@ describe('StreamingEngine', () => {
     await mediaSourceEngine.destroy();
 
     playhead.release();
-
-    // Work-around: allow the Tizen media pipeline to cool down.
-    // Without this, Tizen's pipeline seems to hang in subsequent tests.
-    // TODO: file a bug on Tizen
-    await Util.delay(0.1);
   });
 
   afterAll(() => {
@@ -176,9 +168,9 @@ describe('StreamingEngine', () => {
   }
 
   function createVodStreamGenerator(metadata, type) {
-    let generator = new shaka.test.Mp4VodStreamGenerator(
+    const generator = new shaka.test.Mp4VodStreamGenerator(
         metadata.initSegmentUri,
-        metadata.mvhdOffset,
+        metadata.mdhdOffset,
         metadata.segmentUri,
         metadata.tfdtOffset,
         metadata.segmentDuration,
@@ -190,10 +182,10 @@ describe('StreamingEngine', () => {
   function createLiveStreamGenerator(metadata, type, timeShiftBufferDepth) {
     // Set the generator's AST to 295 seconds in the past so the
     // StreamingEngine begins streaming close to the end of the first Period.
-    let now = Date.now() / 1000;
-    let generator = new shaka.test.Mp4LiveStreamGenerator(
+    const now = Date.now() / 1000;
+    const generator = new shaka.test.Mp4LiveStreamGenerator(
         metadata.initSegmentUri,
-        metadata.mvhdOffset,
+        metadata.mdhdOffset,
         metadata.segmentUri,
         metadata.tfdtOffset,
         metadata.segmentDuration,
@@ -206,30 +198,34 @@ describe('StreamingEngine', () => {
   }
 
   function setupNetworkingEngine(firstPeriodStartTime, secondPeriodStartTime,
-                                 presentationDuration, segmentDurations) {
-    let periodStartTimes = [firstPeriodStartTime, secondPeriodStartTime];
+      presentationDuration, segmentDurations) {
+    const periodStartTimes = [firstPeriodStartTime, secondPeriodStartTime];
 
-    let boundsCheckPosition =
-        shaka.test.StreamingEngineUtil.boundsCheckPosition.bind(
-            null, periodStartTimes, presentationDuration, segmentDurations);
+    const boundsCheckPosition = (time, number, pos) => {
+      return shaka.test.StreamingEngineUtil.boundsCheckPosition(
+          periodStartTimes, presentationDuration, segmentDurations, time,
+          number, pos);
+    };
 
-    let getNumSegments =
-        shaka.test.StreamingEngineUtil.getNumSegments.bind(
-            null, periodStartTimes, presentationDuration, segmentDurations);
+    const getNumSegments = (type, number) => {
+      return shaka.test.StreamingEngineUtil.getNumSegments(
+          periodStartTimes, presentationDuration, segmentDurations, type,
+          number);
+    };
 
     // Create the fake NetworkingEngine. Note: the StreamingEngine should never
     // request a segment that does not exist.
     netEngine = shaka.test.StreamingEngineUtil.createFakeNetworkingEngine(
         // Init segment generator:
-        function(type, periodNumber) {
+        (type, periodNumber) => {
           expect(periodNumber).toBeLessThan(periodStartTimes.length + 1);
-          let wallClockTime = Date.now() / 1000;
-          let segment = generators[type].getInitSegment(wallClockTime);
+          const wallClockTime = Date.now() / 1000;
+          const segment = generators[type].getInitSegment(wallClockTime);
           expect(segment).not.toBeNull();
           return segment;
         },
         // Media segment generator:
-        function(type, periodNumber, position) {
+        (type, periodNumber, position) => {
           expect(boundsCheckPosition(type, periodNumber, position))
               .not.toBeNull();
 
@@ -240,9 +236,9 @@ describe('StreamingEngine', () => {
             numPriorSegments += getNumSegments(type, n);
           }
 
-          let wallClockTime = Date.now() / 1000;
+          const wallClockTime = Date.now() / 1000;
 
-          let segment = generators[type].getSegment(
+          const segment = generators[type].getSegment(
               position, numPriorSegments, wallClockTime);
           expect(segment).not.toBeNull();
           return segment;
@@ -251,7 +247,9 @@ describe('StreamingEngine', () => {
 
   function setupPlayhead() {
     onBuffering = jasmine.createSpy('onBuffering');
-    let onSeek = () => { streamingEngine.seeked(); };
+    const onSeek = () => {
+      streamingEngine.seeked();
+    };
     playhead = new shaka.media.MediaSourcePlayhead(
         /** @type {!HTMLVideoElement} */(video),
         manifest,
@@ -269,11 +267,13 @@ describe('StreamingEngine', () => {
           video: metadata.video.segmentDuration});
 
     manifest.presentationTimeline =
-        /** @type {!shaka.media.PresentationTimeline} */ (timeline);
+      /** @type {!shaka.media.PresentationTimeline} */ (timeline);
     manifest.minBufferTime = 2;
 
     // Create InitSegmentReferences.
-    function makeUris(uri) { return () => { return [uri]; }; }
+    function makeUris(uri) {
+      return () => [uri];
+    }
     manifest.periods[0].variants[0].audio.initSegmentReference =
         new shaka.media.InitSegmentReference(makeUris('1_audio_init'), 0, null);
     manifest.periods[0].variants[0].video.initSegmentReference =
@@ -288,8 +288,9 @@ describe('StreamingEngine', () => {
   }
 
   function createStreamingEngine() {
-    let playerInterface = {
+    const playerInterface = {
       getPresentationTime: () => playhead.getTime(),
+      getBandwidthEstimate: () => 1e6,
       mediaSourceEngine: mediaSourceEngine,
       netEngine: /** @type {!shaka.net.NetworkingEngine} */(netEngine),
       onChooseStreams: Util.spyFunc(onChooseStreams),
@@ -318,7 +319,7 @@ describe('StreamingEngine', () => {
 
       // Let's go!
       onChooseStreams.and.callFake(defaultOnChooseStreams);
-      await streamingEngine.init();
+      await streamingEngine.start();
       await reachesTheEnd();
     });
 
@@ -330,7 +331,7 @@ describe('StreamingEngine', () => {
         video.play();
       });
 
-      onBuffering.and.callFake(function(buffering) {
+      onBuffering.and.callFake((buffering) => {
         if (!buffering) {
           expect(startupComplete).toBeTruthy();
           video.playbackRate = 10;
@@ -339,7 +340,7 @@ describe('StreamingEngine', () => {
 
       // Let's go!
       onChooseStreams.and.callFake(defaultOnChooseStreams);
-      await streamingEngine.init();
+      await streamingEngine.start();
       await reachesTheEnd();
     });
 
@@ -350,7 +351,7 @@ describe('StreamingEngine', () => {
 
       // Let's go!
       onChooseStreams.and.callFake(defaultOnChooseStreams);
-      await streamingEngine.init();
+      await streamingEngine.start();
 
       // After 35 seconds seek back 10 seconds into the first Period.
       await passesTime(35);
@@ -365,7 +366,7 @@ describe('StreamingEngine', () => {
 
       // Let's go!
       onChooseStreams.and.callFake(defaultOnChooseStreams);
-      await streamingEngine.init();
+      await streamingEngine.start();
       await passesTime(20);
       video.currentTime = 40;
       await reachesTheEnd();
@@ -400,7 +401,7 @@ describe('StreamingEngine', () => {
 
       // Let's go!
       onChooseStreams.and.callFake(defaultOnChooseStreams);
-      await streamingEngine.init();
+      await streamingEngine.start();
       await passesTime(305);
     });
 
@@ -414,7 +415,7 @@ describe('StreamingEngine', () => {
 
       // Let's go!
       onChooseStreams.and.callFake(defaultOnChooseStreams);
-      await streamingEngine.init();
+      await streamingEngine.start();
 
       await startUpCompleted;
       // Seek outside the availability window right away. The playhead
@@ -442,11 +443,13 @@ describe('StreamingEngine', () => {
       });
 
       let seekCount = 0;
-      eventManager.listen(video, 'seeking', () => { seekCount++; });
+      eventManager.listen(video, 'seeking', () => {
+        seekCount++;
+      });
 
       // Let's go!
       onChooseStreams.and.callFake(defaultOnChooseStreams);
-      await streamingEngine.init();
+      await streamingEngine.start();
       await passesTime(305);
 
       // We are playing close to the beginning of the availability window.
@@ -479,7 +482,7 @@ describe('StreamingEngine', () => {
 
       // Let's go!
       onChooseStreams.and.callFake(defaultOnChooseStreams);
-      await streamingEngine.init();
+      await streamingEngine.start();
       await passesTime(5);
     });
 
@@ -496,7 +499,7 @@ describe('StreamingEngine', () => {
 
       // Let's go!
       onChooseStreams.and.callFake(defaultOnChooseStreams);
-      await streamingEngine.init();
+      await streamingEngine.start();
       await passesTime(8);
     });
 
@@ -510,7 +513,7 @@ describe('StreamingEngine', () => {
 
       // Let's go!
       onChooseStreams.and.callFake(defaultOnChooseStreams);
-      await streamingEngine.init();
+      await streamingEngine.start();
       await passesTime(23);
       // Should be close enough to still have the gap buffered.
       expect(video.buffered.length).toBe(2);
@@ -527,37 +530,33 @@ describe('StreamingEngine', () => {
 
       // Let's go!
       onChooseStreams.and.callFake(defaultOnChooseStreams);
-      await streamingEngine.init();
+      await streamingEngine.start();
       await passesTime(23);
       // Should be close enough to still have the gap buffered.
       expect(video.buffered.length).toBe(2);
       expect(onEvent).toHaveBeenCalled();
     });
 
-    it('won\'t jump large gaps with preventDefault()', function(done) {
+    it('won\'t jump large gaps with preventDefault()', async () => {
       config.jumpLargeGaps = true;
-      setupGappyContent(/* gapAtStart */ 0, /* dropSegment */ true)
-          .then(() => {
-            onStartupComplete.and.callFake(() => {
-              video.currentTime = 8;
-              video.play();
-            });
+      await setupGappyContent(/* gapAtStart */ 0, /* dropSegment */ true);
+      onStartupComplete.and.callFake(() => {
+        video.currentTime = 8;
+        video.play();
+      });
 
-            onEvent.and.callFake(function(event) {
-              event.preventDefault();
-              shaka.test.Util.delay(5).then(() => {
-                // IE/Edge somehow plays inside the gap.  Just make sure we
-                // don't jump the gap.
-                expect(video.currentTime).toBeLessThan(20);
-                done();
-              })
-              .catch(done.fail);
-            });
+      onEvent.and.callFake((event) => {
+        event.preventDefault();
+      });
 
-            // Let's go!
-            onChooseStreams.and.callFake(defaultOnChooseStreams);
-            return streamingEngine.init();
-          }).catch(done.fail);
+      // Let's go!
+      onChooseStreams.and.callFake(defaultOnChooseStreams);
+      await streamingEngine.start();
+
+      await shaka.test.Util.delay(5);
+      // IE/Edge somehow plays inside the gap.  Just make sure we
+      // don't jump the gap.
+      expect(video.currentTime).toBeLessThan(20);
     });
 
 
@@ -607,8 +606,8 @@ describe('StreamingEngine', () => {
        * @return {!shaka.media.SegmentIndex}
        */
       function createIndex(type) {
-        let d = metadata[type].segmentDuration;
-        let refs = [];
+        const d = metadata[type].segmentDuration;
+        const refs = [];
         let i = 1;
         let time = gapAtStart;
         while (time < 30) {
@@ -619,12 +618,15 @@ describe('StreamingEngine', () => {
             end += d;
           }
 
-          let getUris = (function(i) {
+          let cur = i;
+          const getUris = () => {
             // The times in the media are based on the URL; so to drop a
             // segment, we change the URL.
-            if (i >= 2 && dropSegment) i++;
-            return ['1_' + type + '_' + i];
-          }.bind(null, i));
+            if (cur >= 2 && dropSegment) {
+              cur++;
+            }
+            return ['1_' + type + '_' + cur];
+          };
           refs.push(
               new shaka.media.SegmentReference(i, time, end, getUris, 0, null));
 
@@ -635,14 +637,14 @@ describe('StreamingEngine', () => {
       }
 
       function createInit(type) {
-        let getUris = () => {
+        const getUris = () => {
           return ['1_' + type + '_init'];
         };
         return new shaka.media.InitSegmentReference(getUris, 0, null);
       }
 
-      let videoIndex = createIndex('video');
-      let audioIndex = createIndex('audio');
+      const videoIndex = createIndex('video');
+      const audioIndex = createIndex('audio');
       return {
         presentationTimeline: timeline,
         offlineSessionIds: [],
@@ -654,9 +656,9 @@ describe('StreamingEngine', () => {
             id: 1,
             video: {
               id: 2,
-              createSegmentIndex: Promise.resolve.bind(Promise),
-              findSegmentPosition: videoIndex.find.bind(videoIndex),
-              getSegmentReference: videoIndex.get.bind(videoIndex),
+              createSegmentIndex: () => Promise.resolve(),
+              findSegmentPosition: (t) => videoIndex.find(t),
+              getSegmentReference: (i) => videoIndex.get(i),
               initSegmentReference: createInit('video'),
               // Normally PTO adjusts the segment time backwards; so to make the
               // segment appear in the future, use a negative.
@@ -670,9 +672,9 @@ describe('StreamingEngine', () => {
             },
             audio: {
               id: 3,
-              createSegmentIndex: Promise.resolve.bind(Promise),
-              findSegmentPosition: audioIndex.find.bind(audioIndex),
-              getSegmentReference: audioIndex.get.bind(audioIndex),
+              createSegmentIndex: () => Promise.resolve(),
+              findSegmentPosition: (t) => audioIndex.find(t),
+              getSegmentReference: (i) => audioIndex.get(i),
               initSegmentReference: createInit('audio'),
               presentationTimeOffset: -gapAtStart,
               mimeType: 'audio/mp4',

@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-describe('Mp4VttParser', function() {
+describe('Mp4VttParser', () => {
   const vttInitSegmentUri = '/base/test/test/assets/vtt-init.mp4';
   const vttSegmentUri = '/base/test/test/assets/vtt-segment.mp4';
   const vttSegmentMultiPayloadUri =
@@ -38,30 +38,29 @@ describe('Mp4VttParser', function() {
   /** @type {!Uint8Array} */
   let audioInitSegment;
 
-  beforeAll(function(done) {
-    Promise.all([
+  beforeAll(async () => {
+    const responses = await Promise.all([
       shaka.test.Util.fetch(vttInitSegmentUri),
       shaka.test.Util.fetch(vttSegmentUri),
       shaka.test.Util.fetch(vttSegmentMultiPayloadUri),
       shaka.test.Util.fetch(vttSegSettingsUri),
       shaka.test.Util.fetch(vttSegNoDurationUri),
       shaka.test.Util.fetch(audioInitSegmentUri),
-    ]).then(function(responses) {
-      vttInitSegment = new Uint8Array(responses[0]);
-      vttSegment = new Uint8Array(responses[1]);
-      vttSegmentMultiPayload = new Uint8Array(responses[2]);
-      vttSegSettings = new Uint8Array(responses[3]);
-      vttSegNoDuration = new Uint8Array(responses[4]);
-      audioInitSegment = new Uint8Array(responses[5]);
-    }).catch(fail).then(done);
+    ]);
+    vttInitSegment = new Uint8Array(responses[0]);
+    vttSegment = new Uint8Array(responses[1]);
+    vttSegmentMultiPayload = new Uint8Array(responses[2]);
+    vttSegSettings = new Uint8Array(responses[3]);
+    vttSegNoDuration = new Uint8Array(responses[4]);
+    audioInitSegment = new Uint8Array(responses[5]);
   });
 
-  it('parses init segment', function() {
+  it('parses init segment', () => {
     new shaka.text.Mp4VttParser().parseInit(vttInitSegment);
   });
 
-  it('parses media segment', function() {
-    let cues = [
+  it('parses media segment', () => {
+    const cues = [
       {
         start: 111.8,
         end: 115.8,
@@ -75,15 +74,15 @@ describe('Mp4VttParser', function() {
       },
     ];
 
-    let parser = new shaka.text.Mp4VttParser();
+    const parser = new shaka.text.Mp4VttParser();
     parser.parseInit(vttInitSegment);
-    let time = {periodStart: 0, segmentStart: 0, segmentEnd: 0};
-    let result = parser.parseMedia(vttSegment, time);
+    const time = {periodStart: 0, segmentStart: 0, segmentEnd: 0};
+    const result = parser.parseMedia(vttSegment, time);
     verifyHelper(cues, result);
   });
 
   it('plays multiple payloads at one time if specified by size', () => {
-    let cues = [
+    const cues = [
       {
         start: 110,
         end: 113,
@@ -103,16 +102,16 @@ describe('Mp4VttParser', function() {
       },
     ];
 
-    let parser = new shaka.text.Mp4VttParser();
+    const parser = new shaka.text.Mp4VttParser();
     parser.parseInit(vttInitSegment);
-    let time = {periodStart: 0, segmentStart: 0, segmentEnd: 0};
-    let result = parser.parseMedia(vttSegmentMultiPayload, time);
+    const time = {periodStart: 0, segmentStart: 0, segmentEnd: 0};
+    const result = parser.parseMedia(vttSegmentMultiPayload, time);
     verifyHelper(cues, result);
   });
 
-  it('parses media segment containing settings', function() {
+  it('parses media segment containing settings', () => {
     const Cue = shaka.text.Cue;
-    let cues = [
+    const cues = [
       {
         start: 111.8,
         end: 115.8,
@@ -131,16 +130,16 @@ describe('Mp4VttParser', function() {
       },
     ];
 
-    let parser = new shaka.text.Mp4VttParser();
+    const parser = new shaka.text.Mp4VttParser();
     parser.parseInit(vttInitSegment);
-    let time = {periodStart: 0, segmentStart: 0, segmentEnd: 0};
-    let result = parser.parseMedia(vttSegSettings, time);
+    const time = {periodStart: 0, segmentStart: 0, segmentEnd: 0};
+    const result = parser.parseMedia(vttSegSettings, time);
     verifyHelper(cues, result);
   });
 
-  it('parses media segments without a sample duration', function() {
+  it('parses media segments without a sample duration', () => {
     // Regression test for https://github.com/google/shaka-player/issues/919
-    let cues = [
+    const cues = [
       {start: 10, end: 11, payload: 'cue 10'},
       {start: 11, end: 12, payload: 'cue 11'},
       {start: 12, end: 13, payload: 'cue 12'},
@@ -153,15 +152,15 @@ describe('Mp4VttParser', function() {
       {start: 19, end: 20, payload: 'cue 19'},
     ];
 
-    let parser = new shaka.text.Mp4VttParser();
+    const parser = new shaka.text.Mp4VttParser();
     parser.parseInit(vttInitSegment);
-    let time = {periodStart: 0, segmentStart: 0, segmentEnd: 0};
-    let result = parser.parseMedia(vttSegNoDuration, time);
+    const time = {periodStart: 0, segmentStart: 0, segmentEnd: 0};
+    const result = parser.parseMedia(vttSegNoDuration, time);
     verifyHelper(cues, result);
   });
 
-  it('accounts for offset', function() {
-    let cues = [
+  it('accounts for offset', () => {
+    const cues = [
       {
         start: 121.8,
         end: 125.8,
@@ -175,26 +174,22 @@ describe('Mp4VttParser', function() {
       },
     ];
 
-    let parser = new shaka.text.Mp4VttParser();
+    const parser = new shaka.text.Mp4VttParser();
     parser.parseInit(vttInitSegment);
-    let time = {periodStart: 10, segmentStart: 0, segmentEnd: 0};
-    let result = parser.parseMedia(vttSegment, time);
+    const time = {periodStart: 10, segmentStart: 0, segmentEnd: 0};
+    const result = parser.parseMedia(vttSegment, time);
     verifyHelper(cues, result);
   });
 
-  it('rejects init segment with no vtt', function() {
-    let error = new shaka.util.Error(
+  it('rejects init segment with no vtt', () => {
+    const error = shaka.test.Util.jasmineError(new shaka.util.Error(
         shaka.util.Error.Severity.CRITICAL,
         shaka.util.Error.Category.TEXT,
-        shaka.util.Error.Code.INVALID_MP4_VTT);
-    try {
-      new shaka.text.Mp4VttParser().parseInit(audioInitSegment);
-      fail('Mp4 file with no vtt supported');
-    } catch (e) {
-      shaka.test.Util.expectToEqualError(e, error);
-    }
-  });
+        shaka.util.Error.Code.INVALID_MP4_VTT));
 
+    expect(() => new shaka.text.Mp4VttParser().parseInit(audioInitSegment))
+        .toThrow(error);
+  });
 
   function verifyHelper(expected, actual) {
     expect(actual).toBeTruthy();

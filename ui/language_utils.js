@@ -19,6 +19,7 @@
 goog.provide('shaka.ui.LanguageUtils');
 
 goog.require('mozilla.LanguageMapping');
+goog.require('shaka.util.Dom');
 
 
 shaka.ui.LanguageUtils = class {
@@ -31,13 +32,13 @@ shaka.ui.LanguageUtils = class {
    * @param {!HTMLElement} currentSelectionElement
    * @param {shaka.ui.Localization} localization
    */
-   // TODO: Do the benefits of having this common code in a method still
-   // outweigh the complexity of the parameter list?
+  // TODO: Do the benefits of having this common code in a method still
+  // outweigh the complexity of the parameter list?
   static updateLanguages(tracks, langMenu, languages, onLanguageSelected,
       updateChosen, currentSelectionElement, localization) {
     // Using array.filter(f)[0] as an alternative to array.find(f) which is
     // not supported in IE11.
-    const activeTracks = tracks.filter(function(track) {
+    const activeTracks = tracks.filter((track) => {
       return track.active == true;
     });
     const selectedTrack = activeTracks[0];
@@ -45,22 +46,22 @@ shaka.ui.LanguageUtils = class {
     // Remove old languages
     // 1. Save the back to menu button
     const backButton = shaka.ui.Utils.getFirstDescendantWithClassName(
-      langMenu, 'shaka-back-to-overflow-button');
+        langMenu, 'shaka-back-to-overflow-button');
 
     // 2. Remove everything
-    while (langMenu.firstChild) {
-      langMenu.removeChild(langMenu.firstChild);
-    }
+    shaka.util.Dom.removeAllChildren(langMenu);
 
     // 3. Add the backTo Menu button back
     langMenu.appendChild(backButton);
 
     // 4. Add new buttons
-    languages.forEach((language) => {
-      let button = shaka.ui.Utils.createHTMLElement('button');
-      button.addEventListener('click', () => { onLanguageSelected(language); });
+    for (const language of languages) {
+      const button = shaka.util.Dom.createHTMLElement('button');
+      button.addEventListener('click', () => {
+        onLanguageSelected(language);
+      });
 
-      let span = shaka.ui.Utils.createHTMLElement('span');
+      const span = shaka.util.Dom.createHTMLElement('span');
       span.textContent =
         shaka.ui.LanguageUtils.getLanguageName(language, localization);
       button.appendChild(span);
@@ -72,7 +73,7 @@ shaka.ui.LanguageUtils = class {
         currentSelectionElement.textContent = span.textContent;
       }
       langMenu.appendChild(button);
-    });
+    }
   }
 
 
@@ -113,9 +114,11 @@ shaka.ui.LanguageUtils = class {
     // are used to indicate something that isn't one specific language.
     switch (locale) {
       case 'mul':
-        return resolve(shaka.ui.Locales.Ids.LABEL_MULTIPLE_LANGUAGES);
+        return resolve(shaka.ui.Locales.Ids.MULTIPLE_LANGUAGES);
+      case 'und':
+        return resolve(shaka.ui.Locales.Ids.UNDETERMINED_LANGUAGE);
       case 'zxx':
-        return resolve(shaka.ui.Locales.Ids.LABEL_NOT_APPLICABLE);
+        return resolve(shaka.ui.Locales.Ids.NOT_APPLICABLE);
     }
 
     // Extract the base language from the locale as a fallback step.
@@ -133,7 +136,7 @@ shaka.ui.LanguageUtils = class {
       return mozilla.LanguageMapping[language].nativeName +
           ' (' + locale + ')';
     } else {
-      return resolve(shaka.ui.Locales.Ids.LABEL_UNKNOWN_LANGUAGE) +
+      return resolve(shaka.ui.Locales.Ids.UNRECOGNIZED_LANGUAGE) +
           ' (' + locale + ')';
     }
   }

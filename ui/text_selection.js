@@ -24,6 +24,7 @@ goog.require('shaka.ui.LanguageUtils');
 goog.require('shaka.ui.Locales');
 goog.require('shaka.ui.Localization');
 goog.require('shaka.ui.OverflowMenu');
+goog.require('shaka.util.Dom');
 
 
 /**
@@ -44,44 +45,46 @@ shaka.ui.TextSelection = class extends shaka.ui.Element {
     this.addTextLangMenu_();
 
     this.eventManager.listen(
-      this.localization, shaka.ui.Localization.LOCALE_UPDATED, () => {
-        this.updateLocalizedStrings_();
-        // If captions/subtitles are off, this string needs localization.
-        // TODO: is there a more efficient way of updating just the strings
-        // we need instead of running the whole language update?
-        this.updateTextLanguages_();
-      });
+        this.localization, shaka.ui.Localization.LOCALE_UPDATED, () => {
+          this.updateLocalizedStrings_();
+          // If captions/subtitles are off, this string needs localization.
+          // TODO: is there a more efficient way of updating just the strings
+          // we need instead of running the whole language update?
+          this.updateTextLanguages_();
+        });
 
     this.eventManager.listen(
-      this.localization, shaka.ui.Localization.LOCALE_CHANGED, () => {
-        this.updateLocalizedStrings_();
-        // If captions/subtitles are off, this string needs localization.
-        // TODO: is there a more efficient way of updating just the strings
-        // we need instead of running the whole language update?
-        this.updateTextLanguages_();
-      });
+        this.localization, shaka.ui.Localization.LOCALE_CHANGED, () => {
+          this.updateLocalizedStrings_();
+          // If captions/subtitles are off, this string needs localization.
+          // TODO: is there a more efficient way of updating just the strings
+          // we need instead of running the whole language update?
+          this.updateTextLanguages_();
+        });
 
     this.eventManager.listen(this.player, 'texttrackvisibility', () => {
-        this.onCaptionStateChange_();
-      });
+      this.onCaptionStateChange_();
+    });
 
     this.eventManager.listen(this.captionButton_, 'click', () => {
-        this.onCaptionClick_();
-      });
+      this.onCaptionClick_();
+    });
 
     this.eventManager.listen(this.player, 'textchanged', () => {
-        this.updateTextLanguages_();
-      });
+      this.updateTextLanguages_();
+    });
 
     this.eventManager.listen(this.player, 'trackschanged', () => {
-        this.onTracksChange_();
-      });
+      this.onTracksChanged_();
+    });
 
     // Initialize caption state with a fake event.
     this.onCaptionStateChange_();
 
     // Set up all the strings in the user's preferred language.
     this.updateLocalizedStrings_();
+
+    this.updateTextLanguages_();
   }
 
 
@@ -90,11 +93,11 @@ shaka.ui.TextSelection = class extends shaka.ui.Element {
    */
   addCaptionButton_() {
     /** @private {!HTMLElement} */
-    this.captionButton_ = shaka.ui.Utils.createHTMLElement('button');
+    this.captionButton_ = shaka.util.Dom.createHTMLElement('button');
     this.captionButton_.classList.add('shaka-caption-button');
 
     /** @private {!HTMLElement} */
-    this.captionIcon_ = shaka.ui.Utils.createHTMLElement('i');
+    this.captionIcon_ = shaka.util.Dom.createHTMLElement('i');
     this.captionIcon_.classList.add('material-icons');
     this.captionIcon_.textContent =
       shaka.ui.Enums.MaterialDesignIcons.CLOSED_CAPTIONS;
@@ -106,16 +109,16 @@ shaka.ui.TextSelection = class extends shaka.ui.Element {
     }
     this.captionButton_.appendChild(this.captionIcon_);
 
-    const label = shaka.ui.Utils.createHTMLElement('label');
+    const label = shaka.util.Dom.createHTMLElement('label');
     label.classList.add('shaka-overflow-button-label');
 
     /** @private {!HTMLElement} */
-    this.captionsNameSpan_ = shaka.ui.Utils.createHTMLElement('span');
+    this.captionsNameSpan_ = shaka.util.Dom.createHTMLElement('span');
 
     label.appendChild(this.captionsNameSpan_);
 
     /** @private {!HTMLElement} */
-    this.currentCaptions_ = shaka.ui.Utils.createHTMLElement('span');
+    this.currentCaptions_ = shaka.util.Dom.createHTMLElement('span');
     this.currentCaptions_.classList.add('shaka-current-selection-span');
     label.appendChild(this.currentCaptions_);
     this.captionButton_.appendChild(label);
@@ -128,35 +131,35 @@ shaka.ui.TextSelection = class extends shaka.ui.Element {
    */
   addTextLangMenu_() {
     /** @private {!HTMLElement} */
-    this.textLangMenu_ = shaka.ui.Utils.createHTMLElement('div');
+    this.textLangMenu_ = shaka.util.Dom.createHTMLElement('div');
     this.textLangMenu_.classList.add('shaka-text-languages');
     this.textLangMenu_.classList.add('shaka-no-propagation');
     this.textLangMenu_.classList.add('shaka-show-controls-on-mouse-over');
     this.textLangMenu_.classList.add('shaka-settings-menu');
 
     /** @private {!HTMLElement} */
-    this.backFromCaptionsButton_ = shaka.ui.Utils.createHTMLElement('button');
+    this.backFromCaptionsButton_ = shaka.util.Dom.createHTMLElement('button');
     this.backFromCaptionsButton_.classList.add('shaka-back-to-overflow-button');
     this.textLangMenu_.appendChild(this.backFromCaptionsButton_);
 
-    const backIcon = shaka.ui.Utils.createHTMLElement('i');
+    const backIcon = shaka.util.Dom.createHTMLElement('i');
     backIcon.classList.add('material-icons');
     backIcon.textContent = shaka.ui.Enums.MaterialDesignIcons.BACK;
     this.backFromCaptionsButton_.appendChild(backIcon);
 
     /** @private {!HTMLElement} */
-    this.backFromCaptionsSpan_ = shaka.ui.Utils.createHTMLElement('span');
+    this.backFromCaptionsSpan_ = shaka.util.Dom.createHTMLElement('span');
     this.backFromCaptionsButton_.appendChild(this.backFromCaptionsSpan_);
 
     // Add the off option
-    const off = shaka.ui.Utils.createHTMLElement('button');
+    const off = shaka.util.Dom.createHTMLElement('button');
     off.setAttribute('aria-selected', 'true');
     this.textLangMenu_.appendChild(off);
 
     off.appendChild(shaka.ui.Utils.checkmarkIcon());
 
     /** @private {!HTMLElement} */
-    this.captionsOffSpan_ = shaka.ui.Utils.createHTMLElement('span');
+    this.captionsOffSpan_ = shaka.util.Dom.createHTMLElement('span');
 
     this.captionsOffSpan_.classList.add('shaka-auto-span');
     off.appendChild(this.captionsOffSpan_);
@@ -177,15 +180,19 @@ shaka.ui.TextSelection = class extends shaka.ui.Element {
 
   /** @private */
   onCaptionStateChange_() {
-    if (this.captionIcon_) {
-      if (this.player.isTextTrackVisible()) {
-        this.captionIcon_.classList.add('shaka-captions-on');
-        this.captionIcon_.classList.remove('shaka-captions-off');
-      } else {
-        this.captionIcon_.classList.add('shaka-captions-off');
-        this.captionIcon_.classList.remove('shaka-captions-on');
-      }
+    if (this.player.isTextTrackVisible()) {
+      this.captionIcon_.classList.add('shaka-captions-on');
+      this.captionIcon_.classList.remove('shaka-captions-off');
+      this.captionButton_.setAttribute('aria-pressed', 'true');
+    } else {
+      this.captionIcon_.classList.add('shaka-captions-off');
+      this.captionIcon_.classList.remove('shaka-captions-on');
+      this.captionButton_.setAttribute('aria-pressed', 'false');
     }
+
+    // TODO: document this event
+    this.controls.dispatchEvent(
+        new shaka.util.FakeEvent('captionselectionupdated'));
   }
 
   /** @private */
@@ -198,16 +205,19 @@ shaka.ui.TextSelection = class extends shaka.ui.Element {
     });
 
     shaka.ui.LanguageUtils.updateLanguages(tracks, this.textLangMenu_,
-      languages,
-      this.onTextLanguageSelected_.bind(this),
-      // Don't mark current text language as chosen unless captions are enabled
-      this.player.isTextTrackVisible(),
-      this.currentCaptions_,
-      this.localization);
+        languages,
+        (lang) => this.onTextLanguageSelected_(lang),
+
+        // Don't mark current text language as chosen unless captions are
+        // enabled
+        this.player.isTextTrackVisible(),
+        this.currentCaptions_,
+        this.localization);
 
     // Add the Off button
-    let offButton = shaka.ui.Utils.createHTMLElement('button');
-    offButton.addEventListener('click', () => {
+    const offButton = shaka.util.Dom.createHTMLElement('button');
+    offButton.classList.add('shaka-turn-captions-off-button');
+    this.eventManager.listen(offButton, 'click', () => {
       this.player.setTextTrackVisibility(false);
       this.updateTextLanguages_();
     });
@@ -221,10 +231,14 @@ shaka.ui.TextSelection = class extends shaka.ui.Element {
       offButton.appendChild(shaka.ui.Utils.checkmarkIcon());
       this.captionsOffSpan_.classList.add('shaka-chosen-item');
       this.currentCaptions_.textContent =
-          this.localization.resolve(shaka.ui.Locales.Ids.LABEL_CAPTIONS_OFF);
+          this.localization.resolve(shaka.ui.Locales.Ids.OFF);
     }
 
     shaka.ui.Utils.focusOnTheChosenItem(this.textLangMenu_);
+
+    // TODO: document this event
+    this.controls.dispatchEvent(
+        new shaka.util.FakeEvent('captionselectionupdated'));
   }
 
 
@@ -235,7 +249,9 @@ shaka.ui.TextSelection = class extends shaka.ui.Element {
    */
   async onTextLanguageSelected_(language) {
     await this.player.setTextTrackVisibility(true);
-    this.player.selectTextLanguage(language);
+    if (this.player) {  // May have become null while awaiting
+      this.player.selectTextLanguage(language);
+    }
   }
 
 
@@ -246,30 +262,22 @@ shaka.ui.TextSelection = class extends shaka.ui.Element {
     const LocIds = shaka.ui.Locales.Ids;
 
     this.captionButton_.setAttribute(shaka.ui.Constants.ARIA_LABEL,
-        this.localization.resolve(LocIds.ARIA_LABEL_CAPTIONS));
+        this.localization.resolve(LocIds.CAPTIONS));
     this.backFromCaptionsButton_.setAttribute(shaka.ui.Constants.ARIA_LABEL,
-        this.localization.resolve(LocIds.ARIA_LABEL_BACK));
+        this.localization.resolve(LocIds.BACK));
     this.captionsNameSpan_.textContent =
-      this.localization.resolve(LocIds.LABEL_CAPTIONS);
+        this.localization.resolve(LocIds.CAPTIONS);
     this.backFromCaptionsSpan_.textContent =
-      this.localization.resolve(LocIds.LABEL_CAPTIONS);
+        this.localization.resolve(LocIds.CAPTIONS);
     this.captionsOffSpan_.textContent =
-      this.localization.resolve(LocIds.LABEL_CAPTIONS_OFF);
+        this.localization.resolve(LocIds.OFF);
   }
 
 
   /** @private */
-  onTracksChange_() {
-    // TS content might have captions embedded in video stream, we can't know
-    // until we start transmuxing. So, always show the caption button if we're
-    // playing TS content.
-    if (shaka.ui.Utils.isTsContent(this.player)) {
-        shaka.ui.Utils.setDisplay(this.captionButton_, true);
-    } else {
-      const hasText = this.player.getTextTracks().length;
-      shaka.ui.Utils.setDisplay(this.captionButton_, hasText > 0);
-    }
-
+  onTracksChanged_() {
+    const hasText = this.player.getTextTracks().length > 0;
+    shaka.ui.Utils.setDisplay(this.captionButton_, hasText);
     this.updateTextLanguages_();
   }
 };

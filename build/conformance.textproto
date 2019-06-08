@@ -52,6 +52,7 @@ requirement {
   # Until we can get this rule updated for ES6 static methods
   # (https://github.com/google/closure-compiler/issues/2880):
   whitelist_regexp: 'test/test/util/canned_idb.js'
+  whitelist_regexp: 'test/assets/assets_integration.js'
 }
 
 
@@ -106,6 +107,7 @@ requirement: {
   error_message: 'Using "console" is not allowed; '
                  'use shaka.log instead'
   whitelist_regexp: 'demo/'
+  whitelist_regexp: 'lib/debug/log.js'
   whitelist_regexp: 'third_party/closure/'
   whitelist_regexp: 'test/test/boot.js'
 }
@@ -214,13 +216,13 @@ requirement: {
   type: BANNED_NAME
   value: 'window.eval'
   error_message: 'Using "eval" is not allowed'
-  whitelist_regexp: 'demo/common/demo_utils.js'
+  whitelist_regexp: 'demo/demo_utils.js'
 }
 requirement: {
   type: BANNED_NAME
   value: 'eval'
   error_message: 'Using "eval" is not allowed'
-  whitelist_regexp: 'demo/common/demo_utils.js'
+  whitelist_regexp: 'demo/demo_utils.js'
 }
 
 
@@ -232,6 +234,8 @@ requirement: {
   error_message: 'Event is not constructable on IE.  Instead, use '
                  'document.createEvent(\'CustomEvent\') to create an event and '
                  'event.initCustomEvent(\'my-event-type\') to initialize it.'
+  whitelist_regexp: 'lib/polyfill/patchedmediakeys_apple.js'
+  whitelist_regexp: 'lib/polyfill/pip_webkit.js'
 }
 
 
@@ -247,6 +251,7 @@ requirement: {
   value: 'TypedArray.prototype.slice'
   error_message: 'TypedArray.slice is not allowed because it '
                  'is not supported on IE11'
+  whitelist_regexp: 'lib/polyfill/patchedmediakeys_apple.js'
 }
 requirement: {
   type: BANNED_NAME

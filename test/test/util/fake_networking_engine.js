@@ -46,18 +46,18 @@ shaka.test.FakeNetworkingEngine = class {
     this.delayNextRequestPromise_ = null;
 
     /** @type {!jasmine.Spy} */
-    this.request =
-        jasmine.createSpy('request').and.callFake(this.requestImpl_.bind(this));
+    this.request = jasmine.createSpy('request')
+        .and.callFake((type, request) => this.requestImpl_(type, request));
 
     /** @type {!jasmine.Spy} */
     this.registerResponseFilter =
         jasmine.createSpy('registerResponseFilter')
-            .and.callFake(this.setResponseFilter.bind(this));
+            .and.callFake((filter) => this.setResponseFilter(filter));
 
     /** @type {!jasmine.Spy} */
     this.unregisterResponseFilter =
-        jasmine.createSpy('unregisterResponseFilter')
-            .and.callFake(this.unregisterResponseFilterImpl_.bind(this));
+        jasmine.createSpy('unregisterResponseFilter').and.callFake(
+            (filter) => this.unregisterResponseFilterImpl_(filter));
 
     /** @private {?shaka.extern.ResponseFilter} */
     this.responseFilter_ = null;
@@ -100,7 +100,7 @@ shaka.test.FakeNetworkingEngine = class {
 
     // Wrap all the async operations into one function so that we can pass it to
     // abortable operation.
-    const asyncOp = Promise.resolve().then(async () => {
+    const asyncOp = async () => {
       if (delay) {
         await delay;
       }
@@ -120,6 +120,7 @@ shaka.test.FakeNetworkingEngine = class {
       /** @type {shaka.extern.Response} */
       const response = {
         uri: requestedUri,
+        originalUri: requestedUri,
         data: result,
         headers: headers,
       };
@@ -131,9 +132,9 @@ shaka.test.FakeNetworkingEngine = class {
       }
 
       return response;
-    });
+    };
 
-    return shaka.util.AbortableOperation.notAbortable(asyncOp);
+    return shaka.util.AbortableOperation.notAbortable(asyncOp());
   }
 
   /**
@@ -314,14 +315,22 @@ shaka.test.FakeNetworkingEngine = class {
    * @param {?number} endByte
    */
   static expectRangeRequest(requestSpy, uri, startByte, endByte) {
-    let range = 'bytes=' + startByte + '-';
-    if (endByte != null) range += endByte;
+    const headers = {};
+    if (startByte == 0 && endByte == null) {
+      // No header required.
+    } else {
+      let range = 'bytes=' + startByte + '-';
+      if (endByte != null) {
+        range += endByte;
+      }
+      headers['Range'] = range;
+    }
 
     expect(requestSpy).toHaveBeenCalledWith(
         shaka.net.NetworkingEngine.RequestType.SEGMENT,
         jasmine.objectContaining({
           uris: [uri],
-          headers: jasmine.objectContaining({'Range': range}),
+          headers: headers,
         }));
   }
 };

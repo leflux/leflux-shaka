@@ -81,6 +81,7 @@ shaka.extern.StateChange;
  *
  *   loadLatency: number,
  *   playTime: number,
+ *   pauseTime: number,
  *   bufferingTime: number,
  *
  *   switchHistory: !Array.<shaka.extern.TrackChoice>,
@@ -114,6 +115,8 @@ shaka.extern.StateChange;
  *   the time the 'loadeddata' event is fired by the media element.
  * @property {number} playTime
  *   The total time spent in a playing state in seconds.
+ * @property {number} pauseTime
+ *   The total time spent in a paused state in seconds.
  * @property {number} bufferingTime
  *   The total time spent in a buffering state in seconds.
  *
@@ -188,6 +191,7 @@ shaka.extern.BufferedInfo;
  *   videoCodec: ?string,
  *   primary: boolean,
  *   roles: !Array.<string>,
+ *   audioRoles: Array.<string>,
  *   videoId: ?number,
  *   audioId: ?number,
  *   channelsCount: ?number,
@@ -245,6 +249,9 @@ shaka.extern.BufferedInfo;
  *   cannot be satisfied.
  * @property {!Array.<string>} roles
  *   The roles of the track, e.g. 'main', 'caption', or 'commentary'.
+ * @property {Array.<string>} audioRoles
+ *   The roles of the audio in the track, e.g. 'main' or 'commentary'.
+ *   Will be null for text tracks or variant tracks without audio.
  * @property {?number} videoId
  *   (only for variant tracks) The video stream id.
  * @property {?number} audioId
@@ -794,7 +801,8 @@ shaka.extern.OfflineConfiguration;
  *   Optional playback and seek end time in seconds. Defaults to the end of
  *   the presentation if not provided.
  * @property {shaka.extern.TextDisplayer.Factory} textDisplayFactory
- *   A factory to construct text displayer.
+ *   A factory to construct text displayer. Note that, if this is changed during
+ *   playback, it will cause the text tracks to be reloaded.
  * @exportDoc
  */
 shaka.extern.PlayerConfiguration;

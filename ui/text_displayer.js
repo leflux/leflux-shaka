@@ -18,7 +18,7 @@
 
 goog.provide('shaka.ui.TextDisplayer');
 
-goog.require('shaka.ui.Utils');
+goog.require('shaka.util.Dom');
 
 
 /**
@@ -46,7 +46,7 @@ shaka.ui.TextDisplayer = class {
     this.videoContainer_ = videoContainer;
 
     /** @type {HTMLElement} */
-    this.textContainer_ = shaka.ui.Utils.createHTMLElement('div');
+    this.textContainer_ = shaka.util.Dom.createHTMLElement('div');
     this.textContainer_.classList.add('shaka-text-container');
     this.videoContainer_.appendChild(this.textContainer_);
 
@@ -115,11 +115,11 @@ shaka.ui.TextDisplayer = class {
     }
 
     for (const cue of cuesToRemove) {
-        const captions = this.currentCuesMap_.get(cue);
-        if (captions) {
-          this.textContainer_.removeChild(captions);
-          this.currentCuesMap_.delete(cue);
-        }
+      const captions = this.currentCuesMap_.get(cue);
+      if (captions) {
+        this.textContainer_.removeChild(captions);
+        this.currentCuesMap_.delete(cue);
+      }
     }
 
     // Remove the cues out of the time range.
@@ -153,13 +153,14 @@ shaka.ui.TextDisplayer = class {
 
     // Return true if the cue should be displayed at the current time point.
     const shouldCueBeDisplayed = (cue) => {
-      return cue.startTime <= currentTime && cue.endTime >= currentTime;
+      return this.isTextVisible_ &&
+             cue.startTime <= currentTime && cue.endTime >= currentTime;
     };
 
     // For each cue in the current cues map, if the cue's end time has passed,
     // remove the entry from the map, and remove the captions from the page.
     for (const cue of this.currentCuesMap_.keys()) {
-        if (!shouldCueBeDisplayed(cue)) {
+      if (!shouldCueBeDisplayed(cue)) {
         const captions = this.currentCuesMap_.get(cue);
         this.textContainer_.removeChild(captions);
         this.currentCuesMap_.delete(cue);
@@ -180,7 +181,7 @@ shaka.ui.TextDisplayer = class {
     });
 
     for (const cue of currentCues) {
-      const captions = shaka.ui.Utils.createHTMLElement('span');
+      const captions = shaka.util.Dom.createHTMLElement('span');
       this.setCaptionStyles_(captions, cue);
       this.currentCuesMap_.set(cue, captions);
       this.textContainer_.appendChild(captions);
@@ -203,6 +204,20 @@ shaka.ui.TextDisplayer = class {
     captionsStyle.backgroundColor = cue.backgroundColor;
     captionsStyle.color = cue.color;
     captionsStyle.direction = cue.direction;
+
+    if (cue.backgroundImage) {
+      captionsStyle.backgroundImage = 'url(\'' + cue.backgroundImage + '\')';
+      captionsStyle.backgroundRepeat = 'no-repeat';
+      captionsStyle.backgroundSize = 'contain';
+      captionsStyle.backgroundPosition = 'center';
+    }
+    if (cue.backgroundImage && cue.region) {
+      const percentageUnit = shaka.text.CueRegion.units.PERCENTAGE;
+      const heightUnit = cue.region.heightUnits == percentageUnit ? '%' : 'px';
+      const widthUnit = cue.region.widthUnits == percentageUnit ? '%' : 'px';
+      captionsStyle.height = cue.region.height + heightUnit;
+      captionsStyle.width = cue.region.width + widthUnit;
+    }
 
     // The displayAlign attribute specifys the vertical alignment of the
     // captions inside the text container. Before means at the top of the
@@ -241,21 +256,21 @@ shaka.ui.TextDisplayer = class {
       if (cue.lineInterpretation == Cue.lineInterpretation.PERCENTAGE) {
         if (cue.writingMode == Cue.writingMode.HORIZONTAL_TOP_TO_BOTTOM) {
           if (cue.lineAlign == Cue.lineAlign.START) {
-            this.textContainer_.top = cue.line + '%';
+            panelStyle.top = cue.line + '%';
           } else if (cue.lineAlign == Cue.lineAlign.END) {
-            this.textContainer_.bottom = cue.line + '%';
+            panelStyle.bottom = cue.line + '%';
           }
         } else if (cue.writingMode == Cue.writingMode.VERTICAL_LEFT_TO_RIGHT) {
           if (cue.lineAlign == Cue.lineAlign.START) {
-            this.textContainer_.left = cue.line + '%';
+            panelStyle.left = cue.line + '%';
           } else if (cue.lineAlign == Cue.lineAlign.END) {
-            this.textContainer_.right = cue.line + '%';
+            panelStyle.right = cue.line + '%';
           }
         } else {
           if (cue.lineAlign == Cue.lineAlign.START) {
-            this.textContainer_.right = cue.line + '%';
+            panelStyle.right = cue.line + '%';
           } else if (cue.lineAlign == Cue.lineAlign.END) {
-            this.textContainer_.left = cue.line + '%';
+            panelStyle.left = cue.line + '%';
           }
         }
       }
@@ -267,18 +282,18 @@ shaka.ui.TextDisplayer = class {
     // direction defined by the writing direction.
     if (cue.position) {
       if (cue.writingMode == Cue.writingMode.HORIZONTAL_TOP_TO_BOTTOM) {
-        this.textContainer_.paddingLeft = cue.position;
+        panelStyle.paddingLeft = cue.position;
       } else {
-        this.textContainer_.paddingTop = cue.position;
+        panelStyle.paddingTop = cue.position;
       }
     }
 
     // The positionAlign attribute is an alignment for the text container in
     // the dimension of the writing direction.
     if (cue.positionAlign == Cue.positionAlign.LEFT) {
-      panelStyle.float = 'left';
+      panelStyle.cssFloat = 'left';
     } else if (cue.positionAlign == Cue.positionAlign.RIGHT) {
-      panelStyle.float = 'right';
+      panelStyle.cssFloat = 'right';
     } else {
       panelStyle.margin = 'auto';
     }
@@ -291,9 +306,9 @@ shaka.ui.TextDisplayer = class {
     // interpreted as a percentage of the video, as defined by the writing
     // direction.
     if (cue.writingMode == Cue.writingMode.HORIZONTAL_TOP_TO_BOTTOM) {
-      this.textContainer_.width = cue.size + '%';
+      panelStyle.width = cue.size + '%';
     } else {
-      this.textContainer_.height = cue.size + '%';
+      panelStyle.height = cue.size + '%';
     }
   }
 };

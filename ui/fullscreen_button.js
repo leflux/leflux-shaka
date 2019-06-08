@@ -22,7 +22,7 @@ goog.require('shaka.ui.Element');
 goog.require('shaka.ui.Enums');
 goog.require('shaka.ui.Locales');
 goog.require('shaka.ui.Localization');
-goog.require('shaka.ui.Utils');
+goog.require('shaka.util.Dom');
 
 
 /**
@@ -38,9 +38,15 @@ shaka.ui.FullscreenButton = class extends shaka.ui.Element {
   constructor(parent, controls) {
     super(parent, controls);
 
-    this.button_ = shaka.ui.Utils.createHTMLElement('button');
+    this.button_ = shaka.util.Dom.createHTMLElement('button');
     this.button_.classList.add('shaka-fullscreen-button');
     this.button_.classList.add('material-icons');
+
+    // Don't show the button if fullscreen is not supported
+    if (!document.fullscreenEnabled) {
+      this.button_.classList.add('shaka-hidden');
+    }
+
     this.button_.textContent = shaka.ui.Enums.MaterialDesignIcons.FULLSCREEN;
     this.parent.appendChild(this.button_);
     this.updateAriaLabel_();
@@ -49,18 +55,18 @@ shaka.ui.FullscreenButton = class extends shaka.ui.Element {
     this.videoContainer_ = this.controls.getVideoContainer();
 
     this.eventManager.listen(
-      this.localization, shaka.ui.Localization.LOCALE_UPDATED, () => {
-        this.updateAriaLabel_();
-      });
+        this.localization, shaka.ui.Localization.LOCALE_UPDATED, () => {
+          this.updateAriaLabel_();
+        });
 
     this.eventManager.listen(
-      this.localization, shaka.ui.Localization.LOCALE_CHANGED, () => {
-        this.updateAriaLabel_();
-      });
+        this.localization, shaka.ui.Localization.LOCALE_CHANGED, () => {
+          this.updateAriaLabel_();
+        });
 
     this.eventManager.listen(this.button_, 'click', () => {
-        this.toggleFullScreen_();
-      });
+      this.toggleFullScreen_();
+    });
 
     if (screen.orientation) {
       this.eventManager.listen(screen.orientation, 'change', () => {
@@ -69,9 +75,9 @@ shaka.ui.FullscreenButton = class extends shaka.ui.Element {
     }
 
     this.eventManager.listen(document, 'fullscreenchange', () => {
-        this.updateIcon_();
-        this.updateAriaLabel_();
-      });
+      this.updateIcon_();
+      this.updateAriaLabel_();
+    });
   }
 
   /**
@@ -80,8 +86,7 @@ shaka.ui.FullscreenButton = class extends shaka.ui.Element {
   updateAriaLabel_() {
     const LocIds = shaka.ui.Locales.Ids;
     const label = document.fullscreenElement ?
-                   LocIds.ARIA_LABEL_EXIT_FULL_SCREEN :
-                   LocIds.ARIA_LABEL_FULL_SCREEN;
+        LocIds.EXIT_FULL_SCREEN : LocIds.FULL_SCREEN;
 
     this.button_.setAttribute(shaka.ui.Constants.ARIA_LABEL,
         this.localization.resolve(label));
@@ -104,6 +109,16 @@ shaka.ui.FullscreenButton = class extends shaka.ui.Element {
     if (document.fullscreenElement) {
       document.exitFullscreen();
     } else {
+      // If you are in PiP mode, leave PiP mode first.
+      try {
+        if (document.pictureInPictureElement) {
+          await document.exitPictureInPicture();
+        }
+      } catch (error) {
+        this.controls.dispatchEvent(new shaka.util.FakeEvent('error', {
+          detail: error,
+        }));
+      }
       await this.videoContainer_.requestFullscreen();
     }
   }
@@ -117,7 +132,7 @@ shaka.ui.FullscreenButton = class extends shaka.ui.Element {
   onScreenRotation_() {
     if (!this.video ||
         this.video.readyState == 0 ||
-        this.controls.getCastProxy().isCasting()) return;
+        this.controls.getCastProxy().isCasting()) { return; }
 
     if (screen.orientation.type.includes('landscape') &&
         !document.fullscreenElement) {
@@ -142,5 +157,5 @@ shaka.ui.FullscreenButton.Factory = class {
 };
 
 shaka.ui.Controls.registerElement(
-  'fullscreen', new shaka.ui.FullscreenButton.Factory());
+    'fullscreen', new shaka.ui.FullscreenButton.Factory());
 

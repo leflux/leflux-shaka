@@ -1,4 +1,5 @@
 /**
+ * @license
  * Copyright 2016 Google Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -16,28 +17,11 @@
 
 /* UI elements that did not fit into the buttons/range elements category. */
 
-
-/* This is a div containing the current time and duration of the video.  It sits
- * to the left of the control buttons and above (Y axis) the seek bar.
- * The actual text is inside another div, which is important for click events.
- */
-.shaka-current-time {
-  /* Use Roboto if available. */
-  font-family: Roboto-Regular, Roboto, sans-serif;
-  font-size: 16px;
-  color: rgb(255, 255, 255);
-
-  /* Make the time element the right size for the text, instead of defaulting
-   * to the same size as the rest of the controls. */
-  height: auto;
-
-  cursor: default;
-  .unselectable();
-}
-
 /* This is a spacer element used to separate elements within the control
  * buttons panel. It's just an empty div of certain width. */
 .shaka-spacer {
+  /* This should not have a pointer-style cursor like the other controls. */
+  cursor: default;
 
   /* Make the element shrink to accommodate things to the right. */
   .shrinkable();

@@ -110,6 +110,9 @@ shaka.extern.Request;
  * @property {string} uri
  *   The URI which was loaded.  Request filters and server redirects can cause
  *   this to be different from the original request URIs.
+ * @property {string} originalUri
+ *   The original URI passed to the browser for networking. This is before any
+ *   redirects, but after request filters are executed.
  * @property {ArrayBuffer} data
  *   The body of the response.
  * @property {!Object.<string, string>} headers
@@ -132,20 +135,23 @@ shaka.extern.Response;
  * @typedef {!function(string,
  *                     shaka.extern.Request,
  *                     shaka.net.NetworkingEngine.RequestType,
- *                     shaka.extern.ProgressUpdated=):
+ *                     shaka.extern.ProgressUpdated):
  *     !shaka.extern.IAbortableOperation.<shaka.extern.Response>}
  * @description
  * Defines a plugin that handles a specific scheme.
+ *
  * The functions accepts four parameters, uri string, request, request type,
- * and an optional progressUpdated function.
-
+ * and a progressUpdated function.  The progressUpdated function can be ignored
+ * by plugins that do not have this information, but it will always be provided
+ * by NetworkingEngine.
+ *
  * @exportDoc
  */
 shaka.extern.SchemePlugin;
 
 
 /**
- * @typedef {function(number, number)}
+ * @typedef {function(number, number, number)}
  *
  * @description
  * A callback function to handle progress event through networking engine in
@@ -154,7 +160,8 @@ shaka.extern.SchemePlugin;
  * took to complete.
  * The second argument is the total number of bytes downloaded during that
  * time.
- *
+ * The third argument is the number of bytes remaining to be loaded in a
+ * segment.
  * @exportDoc
  */
 shaka.extern.ProgressUpdated;
